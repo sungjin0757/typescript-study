@@ -124,3 +124,62 @@ alert('Hello', 'TypeScript'); // "Hello" 경고를 표시
 
 
 언제 자바스크립트 런타임 동작을 그대로 모델링할지, 또는 추가적인 타입을 체크를 할 지 분명하지 않다면 타입스크립트를 왜 사용하는지 의문이 들 수 있다. 순전히 사용자의 몫이며, 위의 오류처럼  null + 7 이 7을 출력한다는 것이 익숙하다면 사용하지 않아도 된다.
+## 🌈 Item2. 타입스크립트 설정 이해하기
+
+다음 코드가 오류 없이 타입 체커를 통과할 수 있을지 생각해 보자.
+```typescript
+function add(a, b) {
+    return a + b;
+}
+add(10, null);
+```
+설정이 어떻게 되었냐에 따라 대답할 수 없는 질문이다. 타입스크립트 컴파일러는 매우 많은 설정을 가지고 있다.
+
+이런 설정들은 커맨드라인을 이용하면 됩니다.
+
+`tsc --noImplicitAny program.ts`
+
+tsconfig.json 설정 파일에서도 확인 가능하다.
+<img width="798" alt="스크린샷 2022-10-13 오전 12 23 01" src="https://user-images.githubusercontent.com/56334761/196466894-38dae9db-40d2-48e6-9eac-04ac10be9e61.png">
+
+가급적 설정 파일을 사용하는 것이 좋다. 그래야만 타입스크립트를 어떻게 사용할 계획인지 나눌 수 있기 때문이다. 설정 파일은 tsc --init 만 실행하면 간단히 생성된다.
+
+타입스크립트는 어떻게 설정하느냐에 따라 완전히 다른 언어처럼 느낄 수 있다. 설정을 제대로 사용하려면, noImplicitAny 와 strictNullChecks 를 이해해야 한다.
+
+noImplicitAny 는 변수들이 미리 정의된 타입을 가져야 하는지 여부를 제어한다. 위의 add 의 함수의 경우에는 이 설정이 해제되어 있을 때에는 유효하다.
+
+매개변수에 any 코드를 넣지 않았지만, any 타입으로 간주되기 때문에 이를 암시적 any 라고 부른다. 그런데 같은 코드임에도 noImplicitAny 가 설정되었다면 오류가 된다.
+<img width="509" alt="스크린샷 2022-10-18 오후 11 49 52" src="https://user-images.githubusercontent.com/56334761/196466912-3d0e8064-2ca8-41ac-b12a-3d0ceba867ea.png">
+
+이 오류들은 명시적으로 : any 라고 선언해주거나 더 분명한 타입을 사용하면 해결할 수 있다.
+
+타입스크립트는 타입 정보를 가질 때 가장 효과적이기 때문에, 되도록이면 noImplicitAny 를 설정해야한다. 이를 통해서 타입이 명시될 것이며 문제를 발견하기 수월해지고, 코드의 가독성이 좋아지며, 개발자의 생산성이 향상된다.
+
+
+다음은 strictNullChecks 가 해제되었을 때 유효한 코드이다.
+
+`const x: number = null; // 정상`
+
+`strictNullChecks`를 설정하면 오류가 된다.
+<img width="377" alt="스크린샷 2022-10-19 오전 12 00 53" src="https://user-images.githubusercontent.com/56334761/196467671-5100c1cd-f216-4430-a0f2-dcddfd7f7f6d.png">
+
+null 대신 undefined를 써도 같은 오류가 난다. 만약 null을 허용하려고 한다면 의도를 명시적으로 드러냄으로써 오류를 고칠 수 있다.
+`const x: number | null = null;`
+
+만약 null을 허용하지 않으려면, 이 값이 어디서부터 왔는지 찾아야 하고, null 을 체크하는 코드나 단언문을 추가해야 한다.
+
+```typescript
+const el = document.getElementById('status');
+el.textContent = 'Ready';
+
+if(el) {
+    el.textContent = 'Ready'; // 정상 null은 제외
+}
+el!.textContent = 'Ready'; // 정상, el이 null 이 아님을 단언
+```
+`strictNullChecks` 는 null 과 undefined 관련된 오류를 잡아 내는 데 많은 도움이 되지만, 코드 작성을 어렵게 한다. 새 프로젝트를 시작한다면 설정을 하는 것이 좋지만, 익숙치 않으면 설정하지 않아도 괜찮다.
+`strictNullChecks` 설정하려면 `noImplicitAny` 를 먼저 설정해야한다.
+만약, 이 설정 없이 개발하기로 했다면 undefined 는 객체가 아닙니다 라는 끔찍한 런타임 오류를 주의해야 한다.
+결국은 이 오류 때문에 설정을 할 수밖에 없을테니 가급적 초기에 설정하는 것이 좋을 것이다.
+언어에 의미적으로 영향을 미치는 설정들이 많지만, 지금 배운 설정들 만큼 중요한 설정은 없다.
+만약 모든 체크를 설정하고 싶다면 간단하게 `strict` 만 `true`로 바꿔주면 된다.
