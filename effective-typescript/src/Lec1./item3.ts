@@ -69,3 +69,42 @@ function calculateArea(shape: Shape) {
         return shape.width * shape.width;
     }
 }
+
+function asNumber(val: number | string): number {
+    return val as number;
+}
+
+function asNumber(val: number | string): number {
+    return typeof(val) === 'string' ? Number(val) : val;
+}
+
+function setLightSwitch(val: boolean) {
+    switch(value) {
+        case true:
+            turnLightOn();
+            break;
+        case false:
+            turnLightOff();
+            break;
+        default:
+            console.log(`실행?`);
+    }
+}
+
+interface LightApiResponse {
+    lightSwitchValue: boolean;
+}
+
+async function setLight() {
+    const response = await fetch('/light');
+    const result : LightApiResponse = await response.json();
+    setLightSwitch(result.lightSwitchValue);
+}
+
+function add(a: number, b: number) {
+    return a + b;  // 중복된 함수 구현
+}
+
+function add(a: string, b: string) {
+    return a + b; // // 중복된 함수 구현
+}
