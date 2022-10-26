@@ -249,3 +249,148 @@ const double: [number, number] = triple; //'[number, number, number]' 형식은 
 type T = Exclude<string|Date, string|number>; // 타입은 Date
 type NonZeroNums = Exclude<number, 0>; // 타입은 number
 ```
+
+## Item 8. 타입 공간과 값 공간의 심벌 구분하기
+타입스크립트의 심벌은 타입 공간이나 값 공간 중의 한곳에 존재한다.
+심벌은 이름이 같더라도 속하는 공간에 따라 다른 것을 나타낼 수 있기 때문에 혼란 스러울 수 있다.
+
+```typescript
+interface Cylinder {
+    radius: number;
+    height: number;
+}
+
+const Cylinder = (radius: number, height: number) => ({radius, height});
+```
+
+인터페이스에서 Cylinder 는 타입으로 쓰이지만 const Cylinder 는 이름은 같아도 값으로 쓰이고, 서로 아무런 관련이 없다.
+상황에 따라서 타입으로 쓰일 수도 있고 값으로도 쓰일 수 있기 때문에 가끔 오류를 야기한다.
+
+```typescript
+function calculateVolume(shape: unknown) {
+    if (shape instanceof Cylinder) {
+        shape.radius // '{}' 형식에 'radius' 속성이 없습니다.
+    }
+}
+```
+`instanceof` 는 자바스크립트의 런타임 연산자이고, 값에 대해서 연산을 한다. 그래서 타입이 아니라 함수를 참조한다.
+
+따라서, 심벌이 타입인지 값인지 언뜻 봐서 알 수 없으므로 어떤 형태로 쓰였는지는 문맥을 살펴 알아내야 한다.
+
+다음 리터럴을 예로 보자.
+
+```typescript
+type T1 = 'string literal';
+type T2 = 123;
+const v1 = 'string literal';
+const v2 = 123;
+```
+일반적으로 type이나 interface 다음에 나오는 심벌은 타입인 반면, const나 let 선언에 쓰이는 것은 값이다.
+
+두 공간에 대한 개념을 잡으려면 타입스크립트 플레이그라운드를 활용하면 된다.
+
+<img width="1440" alt="스크린샷 2022-10-26 오후 10 53 00" src="https://user-images.githubusercontent.com/56334761/198044825-a8fc9a2e-7395-4ce7-847d-89a114cf10a5.png">
+
+위의 그림에서 보이는 것 처럼 타입스크립트 소스로부터 변환된 자바스크립트 결과물을 보여 준다.
+심벌이 사라진다면 타입을 의미하는 것이다.
+
+타입스크립트 코드에서 타입과 값은 번갈아 나올 수 있다. 타입선언 또는 단언문 다음에 나오는 심벌은 타입인 반면, = 다음에 나오는 모든 것은 값이다.
+예를들어, 다음 코드를 보자.
+
+```typescript
+const p:Person = {first: "Sungjin", last: "Hong"};
+
+function email(p: Person, subject: string, body: string): Response{
+    
+}
+```
+
+`class` 와 `enum` 은 상황에 따라 타입과 값 두 가지 모두 가능한 예약어이다.
+
+```typescript
+class Cylinder {
+    radius = 1;
+    height = 1;
+}
+
+function calculateVolume(shpae: unknown) {
+    if(shape instanceof Cylinder) {
+        shpae; // 정상, 타입은 Cylinder
+        shpae.radius; // 정상, 타입은 number
+    }
+}
+```
+
+클래스가 타입으로 쓰일 때는 형태(속성과 메서드)가 사용되는 반면, 값으로 쓰일 때는 생성자가 사용된다.
+
+```typescript
+type T1 = typeof p;
+type T2 = typeof email;
+    // 타입은 email(p: Person, subject: string, body: string): Response
+
+const v1 = typeof p; // object
+const v2 = typeof email; // function
+```
+
+타입의 관점에서, `typeof` 는 값을 읽어서 타입스크립트 타입을 반환한다. 타입 공간의 `typeof`는 보다 큰 타입의 일부분으로 사용할 수 있고, `type` 구문으로 이름을 붙이는 용도로도 사용할 수 있다.
+값의 관점에서 `typeof`는 자바스크립트 런타임의 `typeof` 연산자가 된다. 값 공간의 `typeof`는 대상 심벌의 런타임 타입을 가리키는 문자열을 반환하며, 타입스크립트 타입과는 다르다.
+
+```typescript
+const v = typeof Cylinder; // 값이 function
+type T = typeof Cylinder; // 타입이 typeof Cylinder
+```
+클래스가 자바스크립트에서는 실제 함수로 구현되기 때문에 첫 번째 줄의 값은 `function` 이 된다.
+두 번째 줄의 타입은 무슨의미인지 감이 오지 않을 것이다. 여기서 중요한 것은 `Cylinder` 가 인스턴스의 타입이 아니라는 점이다.
+실제로는 `new` 키워드를 사용할 때 볼 수 있는 생성자 함수이다.
+
+```typescript
+declare let fn: T;
+const c = new fn(); // 타입이 cylinder
+```
+
+다음 코드처럼 `InstanceType` 제네릭을 사용해 생성자 타입과 인스턴스 타입을 전환할 수 있다.
+```typescript
+type C = InstanceType<typeof Cylinder>;
+```
+
+속성 접근자인 [] 는 타입으로 쓰일 때에도 동일하게 동작한다. 그러나 `obj['field]` 와 `obj.field` 는 값이 동일하더라도 타입은 다를 수 있다.
+따라서 타입의 속성을 얻을 때에는 반드시 첫 번째 방법을 사용해야한다.
+
+```typescript
+const first: Person['first'] = p['first'];
+```
+
+```typescript
+
+type PersonEl = Person['first' | 'last']; // 타입은 string
+type Tuple = [string, number, Date];
+type TupleEl = Tuple[number]; // 타입은 string | number | Date
+```
+
+두 공산 사이에서 다른 의미를 가지는 코드 패턴들이 있다.
+- 값으로 쓰이는 this는 자바스크립트의 this 키워드다. 타입으로 쓰이는 this는, 다형성 this라고 불리는 this의 타입스크립트 타입이다.
+- 값에서 & 와 | 는 And 와 Or 비트연산이다. 타입에서는 인터섹션과 유니온이다.
+- const 는 새 변수를 선언하지만, as const는 리터럴 또는 리터럴 표현식의 추론된 타입을 바꾼다.
+- extends 는 서브클래스 또는 서브타입 또는 제너릭 타입의 한정자를 정의할 수 있다.
+- in은 루프 또는 매핑된 타입에 등장한다.
+
+타입스크립트 코드가 잘 동작하지 않는다면 타입 공간과 값 공간을 혼동해서 잘못 작성했을 가능성이 크다.
+예를들어 `email` 함수의 매개변수를 단일 객체로 바꿨다고 하자.
+
+```typescript
+function email({p: Person, subject: string, body: string}): Response{
+
+}
+```
+모든 타입이 any 형식이 있다고 반응을 합니다.
+
+값의 관점에서 Person 과 string이 해석되었기 때문에 오류가 발생한다.
+Person이라는 변수명과 string  이라는 이름을 가지는 두 개의 변수를 생성하려 한 것이다.
+문제를 해결하려면 타입과 값을 구분해야 한다.
+```typescript
+function email({person, subject, body}: {person: Person, subject: string, body: string}) {
+
+}
+```
+이 코드는 장황하긴 하지만, 매개변수에 명명된 타입을 사용하거나 문맥에서 추론되도록 잘 동작한다.
+
