@@ -1,3 +1,295 @@
+# 1장. 타입스크립트 알아보기
+타입스크립트란 무엇이고, 타입스크립트를 어떻게 여겨야 하는지, 자바스크립트와는 어떤 관계인지, 타입스크립트의 타입들은 null이 가능한지, any 타입에서는 어떨지, 덕 타이핑이 가능한지등을 알아본다.
+
+타입스크립트는 인터프리터로 실행되는 것도 아니고, 저수준 언어로 컴파일 되는 것도 아니다. 자바스크립트로 컴파일되며, 실행 역시 타입스크립트가 아닌 자바스크립트로 이루어진다.
+
+따라서, 둘의 관계는 필연적이다. 이러한 타입스크립트와 자바스크립트의 관계를 잘 이해한다면 타입스크립트 개발자로서 한 단계 성장할 것이다.
+
+## 🌈 Item1. 타입스크립트와 자바스크립트의 관계 이해하기
+
+“타입스크립트는 자바스크립트의 상위 집합이다” 라는 말이 많다. 이 문장들이 정확히 무슨 의미인지, 타입스크립트와 자바스크립트는 어떤 관계인지 자세히 알아보자. 타입스크립트는 자바스크립트와 굉장히 밀접한 관계에 있기 때문에, 어떻게 연관되어 있는지 제대로 이해하는 것이 중요하다.
+
+
+
+자바스크립트는 파일이 .js 확장자를 사용하는 반면, 타입스크립트파일은 .ts 파일을 사용한다. 그렇다고 자바스크립트와 타입스크립트가 다르다는 것을 의미하는 것은 아니고 타입스크립트가 자바스크립트의 슈퍼셋이기 때문에 .js 파일에 있는 코드는 이미 타입스크립트라고 할 수 있다.
+
+
+
+이러한 특성은 기존에 존재하는 자바스크립트 코드를 타입스크립트로 마이그레이션 하는데 엄청난 이점이 된다. 모든 자바스크립트 프로그램이 타입스크립트라는 명제는 참이지만, 그 반대는 성립하지 않는다. 즉, 타입스크립트 프로그램이지만 자바스크립트가 아닌 프로그램이 존재하게 된다. 이는 타입스크립트가 타입을 명시하는 추가적인 문법을 가지기 때문이다.
+
+
+
+다음의 예를 보자.
+```typescript
+function greet(who: string) {
+    console.log('Hello', who);
+}
+```
+
+이는 유효한 타입스크립트 프로그램이다.
+
+그러나 자바스크립트를 구동하는 노드 같은 프로그램으로 앞의 코드를 실행하면 오류를 출력한다. 즉, 타입구문을 사용하는 순간부터 자바스크립트가 아닌 타입스크립트의 영역이다.
+
+
+
+타입스크립트 컴파일러는 타입스크립트뿐만 아니라 일반 자바스크립트 프로그램에도 유용하다. 다음의 예를 보자.
+```
+let city = `new york city`;
+console.log(city.toUpperCase());
+```
+이 코드를 자바스크립트 컴파일로서 실행하면 다음과 같은 오류가 발생한다.
+
+`TypeError: city.toUppercase is not a function`
+
+앞의 코드에는 타입 구문이 없지만, 타입스크립트의 타입 체커는 문제점을 찾아 냅니다. city 변수가 문자열이라는 것을 알려주지 않아도 타입스크립트는 초깃값으로부터 타입을 추론한다.
+
+타입시스템의 목표중 하나는 런타임에 오류를 발생시킬 코드를 미리 찾아내는 것이다. 타입스크립트가 ‘정적’타입 시스템이라는 것은 바로 이런 특징을 말한다.
+
+그러나 모든 오류를 찾아내지는 않는다. 오류가 발생하진 않아도 다른 의도로 동작하는 코드도 있다. 
+
+다음의 자바스크립트 프로그램을 보자.
+```typescript
+const states = [
+    {
+        name: 'A',
+        capital: "seoul"
+    },
+    {
+        name: 'B',
+        capital: "Phoenix"
+    },
+    {
+        name: 'C',
+        capital: "Tokyo"
+    }
+]
+
+// undefined
+// undefined
+// undefined
+for(const state of states) {
+    console.log(state.capitol);
+}
+```
+앞의 코드는 유효한 자바스크립트이며 어떠한 오류도 없이 실행된다. 그러나 루프 내의 state.capial 은 의도한 코드가 아니다.
+
+이런 경우에 타입스크립트 타입체커는 오류를 제시한다.
+
+
+
+타입스크립트는 타입 구문 없이도 오류를 잡을 수 있지만, 타입 구문을 추가한다면 훨씬 더 많은 오류를 찾아낼 수 있다.
+
+물론, 위의 예에서는 어느 쪽이 오타인지 판단하지는 못한다. 따라서 명시적으로 states 를 선언하여 의도를 분명히 해야한다.
+```typescript
+interface State {
+    name: string;
+    capital: string;
+}
+const states: State[] = [
+    {
+        name: 'A',
+        capitol: "seoul"
+    },
+    {
+        name: 'B',
+        capital: "Phoenix"
+    },
+    {
+        name: 'C',
+        capital: "Tokyo"
+    }
+]
+```
+
+
+이제 오류가 어디에서 발생했는지 찾을 수 있고, 제시된 해결책도 올바르다. 의도를 명확히 해서 타입스크립트가 잠재적 문제점을 찾을 수 있게 했다.
+
+
+
+타입스크립트 타입 시스템은 자바스크립트의 런타임 동작을 ‘모델링’ 한다. 런타임 체크를 엄격하게 하는 언어를 사용해 왔다면 다음 결과들이 꽤 당황스럽게 느껴질 것이다.
+```typescript
+const x = 2 + '3'; // 정상, string 타입
+const y = '2' + 3; // 정상, string 타입
+```
+이 예제는 다른 언어였다면 런타임 오류가 될 만한 코드이다. 하지만 타입스크립트의 타입 체커는 정상으로 인식한다. 두 줄 모두 ‘23’으로 출력된다.
+
+반대로 정상 동작하는 코드에 오류를 표시하기도 한다. 다음은 런타임 오류가 발생하지 않는 코드인데, 타입 체커는 문제점을 표시한다.
+```typescript
+const a = null + 7; // 자바스크립트에는 a값이 7
+const b = [] + 12; // 자바스크립트에는 b의 값이 12
+alert('Hello', 'TypeScript'); // "Hello" 경고를 표시
+```
+자바스크립트의 런타임 동작을 모델링하는 것은 타입스크립트 타입 시스템의 기본 원칙이다. 물론, 프로그램에서 오류가 발생하지 않더라도 타입체커가 오류를 표시할 때도 있다.
+
+
+
+언제 자바스크립트 런타임 동작을 그대로 모델링할지, 또는 추가적인 타입을 체크를 할 지 분명하지 않다면 타입스크립트를 왜 사용하는지 의문이 들 수 있다. 순전히 사용자의 몫이며, 위의 오류처럼  null + 7 이 7을 출력한다는 것이 익숙하다면 사용하지 않아도 된다.
+## 🌈 Item2. 타입스크립트 설정 이해하기
+
+다음 코드가 오류 없이 타입 체커를 통과할 수 있을지 생각해 보자.
+```typescript
+function add(a, b) {
+    return a + b;
+}
+add(10, null);
+```
+설정이 어떻게 되었냐에 따라 대답할 수 없는 질문이다. 타입스크립트 컴파일러는 매우 많은 설정을 가지고 있다.
+
+이런 설정들은 커맨드라인을 이용하면 됩니다.
+
+`tsc --noImplicitAny program.ts`
+
+tsconfig.json 설정 파일에서도 확인 가능하다.
+<img width="798" alt="스크린샷 2022-10-13 오전 12 23 01" src="https://user-images.githubusercontent.com/56334761/196466894-38dae9db-40d2-48e6-9eac-04ac10be9e61.png">
+
+가급적 설정 파일을 사용하는 것이 좋다. 그래야만 타입스크립트를 어떻게 사용할 계획인지 나눌 수 있기 때문이다. 설정 파일은 tsc --init 만 실행하면 간단히 생성된다.
+
+타입스크립트는 어떻게 설정하느냐에 따라 완전히 다른 언어처럼 느낄 수 있다. 설정을 제대로 사용하려면, noImplicitAny 와 strictNullChecks 를 이해해야 한다.
+
+noImplicitAny 는 변수들이 미리 정의된 타입을 가져야 하는지 여부를 제어한다. 위의 add 의 함수의 경우에는 이 설정이 해제되어 있을 때에는 유효하다.
+
+매개변수에 any 코드를 넣지 않았지만, any 타입으로 간주되기 때문에 이를 암시적 any 라고 부른다. 그런데 같은 코드임에도 noImplicitAny 가 설정되었다면 오류가 된다.
+<img width="509" alt="스크린샷 2022-10-18 오후 11 49 52" src="https://user-images.githubusercontent.com/56334761/196466912-3d0e8064-2ca8-41ac-b12a-3d0ceba867ea.png">
+
+이 오류들은 명시적으로 : any 라고 선언해주거나 더 분명한 타입을 사용하면 해결할 수 있다.
+
+타입스크립트는 타입 정보를 가질 때 가장 효과적이기 때문에, 되도록이면 noImplicitAny 를 설정해야한다. 이를 통해서 타입이 명시될 것이며 문제를 발견하기 수월해지고, 코드의 가독성이 좋아지며, 개발자의 생산성이 향상된다.
+
+
+다음은 strictNullChecks 가 해제되었을 때 유효한 코드이다.
+
+`const x: number = null; // 정상`
+
+`strictNullChecks`를 설정하면 오류가 된다.
+<img width="377" alt="스크린샷 2022-10-19 오전 12 00 53" src="https://user-images.githubusercontent.com/56334761/196467671-5100c1cd-f216-4430-a0f2-dcddfd7f7f6d.png">
+
+null 대신 undefined를 써도 같은 오류가 난다. 만약 null을 허용하려고 한다면 의도를 명시적으로 드러냄으로써 오류를 고칠 수 있다.
+`const x: number | null = null;`
+
+만약 null을 허용하지 않으려면, 이 값이 어디서부터 왔는지 찾아야 하고, null 을 체크하는 코드나 단언문을 추가해야 한다.
+
+```typescript
+const el = document.getElementById('status');
+el.textContent = 'Ready';
+
+if(el) {
+    el.textContent = 'Ready'; // 정상 null은 제외
+}
+el!.textContent = 'Ready'; // 정상, el이 null 이 아님을 단언
+```
+`strictNullChecks` 는 null 과 undefined 관련된 오류를 잡아 내는 데 많은 도움이 되지만, 코드 작성을 어렵게 한다. 새 프로젝트를 시작한다면 설정을 하는 것이 좋지만, 익숙치 않으면 설정하지 않아도 괜찮다.
+`strictNullChecks` 설정하려면 `noImplicitAny` 를 먼저 설정해야한다.
+만약, 이 설정 없이 개발하기로 했다면 undefined 는 객체가 아닙니다 라는 끔찍한 런타임 오류를 주의해야 한다.
+결국은 이 오류 때문에 설정을 할 수밖에 없을테니 가급적 초기에 설정하는 것이 좋을 것이다.
+언어에 의미적으로 영향을 미치는 설정들이 많지만, 지금 배운 설정들 만큼 중요한 설정은 없다.
+만약 모든 체크를 설정하고 싶다면 간단하게 `strict` 만 `true`로 바꿔주면 된다.
+
+## Item3. 코드 생성과 타입이 관계없음을 이해하기
+타입스크립트 컴파일러는 두 가지 역할을 수행한다.
+- 최신 타입스크립트/자바스크립트를 브라우저에서 동작할 수 있도록 구버전의 자바스크립트로 트랜스파일한다.
+- 코드의 타입 오류를 체크한다.
+
+여기서 놀라운 점은 이 두 가지가 서로 완벽히 독립적이라는 것이다. 다시 말해서, 타입스크립트가 자바스크립트로 변환될 때 코드 내의 타입에는 영향을 주지 않는다. 또한 그 자바스크립트의 실행 시점에도 타입은 영향을 미치지 않는다.
+
+**타입 오류가 있는 코드도 컴파일이 가능하다**
+컴파일은 타입 체크와 독립적으로 동작하기 때문에, 타입 오류가 있는 코드도 컴파일이 가능하다.
+타입 체크와 컴파일이 동시에 이루어지는 C나 자바 같은 언어를 사용하던 사람이라면 이러한 상황이 매우 황당하게 느껴질 것이다.
+타입 오류가 있는 데도 컴파일된다는 사실 때문에 타입스크립트가 엉성한 언어처럼 보일 수 있다.
+그러나, 코드에 오류가 있더라도 컴파일된 산출물이 나오는 것이 실제로 도움된다. 예를들어, 문제가 된 오류를 수정하지 않더라도 애플리케이션의 다른 부분을 테스트할 수 있다.
+만약 오류가 있을 때 컴파일하지 않으려면, tsconfig.json에 noEmitOnError를 설정하거나 빌드 도구에 동일하게 적용하면 된다.
+
+**런타임에는 타입 체크가 불가능 하다.**
+다음 처럼 코드르 작성해 볼 수 있다.
+```typescript
+interface Square {
+    width: number;
+}
+interface Rectangle extends Square {
+    height: number;
+}
+type Shape = Square | Rectangle;
+
+function calculateArea(shape: Shape) {
+    if (shape instanceof Rectangle) {
+        return shape.width * shape.height;
+    } else {
+        return shape.width * shape.width;
+    }
+}
+```
+<img width="492" alt="스크린샷 2022-10-21 오전 12 02 08" src="https://user-images.githubusercontent.com/56334761/196985699-b592588b-1373-42c5-8ac7-9db796a6e2f7.png">
+
+<img width="354" alt="스크린샷 2022-10-21 오전 12 02 55" src="https://user-images.githubusercontent.com/56334761/196985850-6c020f60-770e-4b4f-a548-991091e1d630.png">
+
+`instanceof` 체크는 런타임에 일어나지만, `Rectangle` 은 타입이기 때문에 런타임 시점에 아무런 역할을 할 수 없다. 타입스크립트의 타입은 제거 가능하다.
+실제로 자바스크립트로 컴파일되는 과정에서 모든 인터페이스, 타입, 타입 구문은 그냥 제거된다.
+앞의 코드에서 다루고 있는 `shape`타입을 명확하게 하려면, 런타임에 타입 정보를 유지하는 방법이 필요하다. 하나의 방법은 `height` 속성이 존재하는지 체크하는 것이다.
+
+```typescript
+function calculateArea(shape: Shape) {
+    if('height' in shape) {
+        shape; // Rectangle
+        return shape.height * shape.width;
+    } else {
+        shape; // Square
+        return shape.width * shape.width;
+    }
+}
+```
+속성 체크는 런타임에 접근 가능한 값에만 관련되지만, 타입 체커 역시도 `shape` 의 타입을 `Rectangle` 로 보정해 주기 때문에 오류가 사라진다.
+타입 정보를 유지하는 또 다른 방법으로는 런타임에 접근 가능한 타입 정보를 명시적으로 저장하는 태그 기법이 있다.
+
+```typescript
+interface Square {
+    kind: 'square';
+    width: number;
+}
+interface Rectangle {
+    kind: 'rectangle';
+    height: number;
+    width: number;
+}
+type Shape = Shape | Rectangle;
+
+function calculateArea(shape: Shape) {
+    if(shape.kind === 'rectangle') {
+        shape; //Rectangle
+        return shape.height * shape.width;
+    } else {
+        shape; // Square
+        return shape.width * shape.width;
+    }
+}
+```
+여기서 `Shape` 타입은 태그된 유니온의 한 예다. 이 기법은 런타임에 타입 정보를 손쉽게 유지할 수 있기 때문에, 타입스크립트에서 흔하게 볼 수 있다.
+
+타입과 값을 둘 다 사용하는 방법도 있다. 타입을 클래스로 만들면 된다.
+```typescript
+class Square {
+    constructor(public width: number){
+
+    }
+}
+
+class Rectangle extends Square{
+    constructor(public width: number, public height: number) {
+        super(width);
+    }
+}
+
+type Shape = Shape | Rectangle;
+
+function calculateArea(shape: Shape) {
+    if (shape instanceof Rectangle) {
+        return shape.width * shape.height;
+    } else {
+        return shape.width * shape.width;
+    }
+}
+```
+인터페이스는 타입으로만 사용 가능하지만, Rectangle을 클래스로 선언하면 타입과 값으로 모두 사용할 수 있으므로 오류가 없다.
+`type Shape = Square | Rectangle` 부분에서 `Rectangle` 은 타입으로 참조되지만, `shape instanceof Rectangle` 부분에서는 값으로 참조 된다.
+
 **타입 연산은 런타임에 영향을 주지 않는다.**
 
 string 또는 number 타입인 값을 항상 number로 정제하는 경우를 가정해 보자.
