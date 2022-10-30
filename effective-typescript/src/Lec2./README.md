@@ -394,3 +394,80 @@ function email({person, subject, body}: {person: Person, subject: string, body: 
 ```
 이 코드는 장황하긴 하지만, 매개변수에 명명된 타입을 사용하거나 문맥에서 추론되도록 잘 동작한다.
 
+## Item 9. 타입 단언보다는 타입 선언을 사용하기
+타입스크립트에서 변수에 값을 할당하고 타입을 부여하는 방법은 두가지다.
+
+```typescript
+interface Person {
+    name:string;
+}
+
+const alice: Person = {name: 'Alice'};
+const bob = { name: 'bob'} as Person;
+```
+
+위의 두 방법은 각자 타입 선언과 타입 단언이다.
+타입 단언보다 타입 선언을 사용하는 것이 좋다. 그 이유는 코드에서 확인할 수 있다.
+```typescript
+const alice: Person = {}; // 'name' 속성이 '{}' 형식에 없지만 'Person' 형식에서 필수입니다.
+const bob = {} as Person; // 오류 없음
+```
+
+타입 선언은 할당되는 값이 해당 인터페이스를 만족하는지 검사한다. 앞의 예제에서는 그러지 못했기 때문에 오류를 표시한다. 타입 단언은 강제로 타입을 지정했으니 타입 체커에게 오류를 무시하라고 하는 것이다.
+
+타입 선언과 타입 단언의 차이는 속성을 추가할 때도 마찬가지다.
+
+```typescript
+const alice: Person = {
+    name: 'Alice',
+    age: 12 //{ name: string; age: number; }' 형식은 'Person' 형식에 할당할 수 없습니다.
+    //개체 리터럴은 알려진 속성만 지정할 수 있으며 'Person' 형식에 'age'이(가) 없습니다.
+}
+
+const bob = {
+    name: "bob",
+    age: 22
+} as Person;
+```
+타입 선언문에서는 잉여 속성 체크가 동작했지만, 단언문에서는 적용되지 않는다.
+단언이 꼭 필요한 경우가 아니라면, 안전성 체크도 되는 선언을 사용하는 것이 좋다.
+
+화살표 함수의 타입 선언은 추론된 타입이 모호할 때가 있다. 예를 들어, 다음 코드에서 Person 인터페이스를 사용하고 싶다고 가정하자.
+
+```typescript
+const people = ['alice', 'bob', 'jan'].map(name => ({name})); 
+// Person[] 을 원했지만 결과는 {name: string} []
+```
+
+타입 단언을 사용하면,
+
+```typescript
+const people = ['alice', 'bob', 'jan'].map(name => ({name} as Person));
+```
+문제가 해결 된 것처럼 보일 수 있지만, 이 또한 런타임 에러를 일으킬 수 있다.
+
+```typescript
+const people = ['alice', 'bob', 'jan'].map(name => ({} as Person));
+```
+
+단언문을 쓰지 않고, 다음과 같이 화살표 함수 안에서 타입과 함께 변수를 선언하는 것이 가장 직관적이다.
+
+```typescript
+const people = ['alice', 'bob', 'jan'].map(name => {
+    const person: Person = {name};
+    return person;
+});
+```
+
+기존 코드에 비해 꽤나 번잡해 보일 수 있습니다. 이를 다음과 같이 바꿀 수 있습니다.
+```typescript
+const people = ['alice', 'bob', 'jan'].map((name): Person => ({name}));
+```
+
+여기서 소괄호는 매우 중요한 의미를 지닌다. `(name): Person` 은 name의 타입이 없고, 반환 타입이 `Person` 이라고 명시한다. 그러나 `(name: Person)` 은 `name`의 타입이 `Person` 임을 명시하고 반환 타입이 없기 때문에 오류가 발생한다.
+
+타입 단언이 꼭 필요한 경우도 있다. 타입 단언은 타입체커가 추론한 타입보다 우리가
+판단하는 타입이 더 정확할 때 의미가 있다.
+
+또한, 자주 쓰이는 특별한 문법(!)을 사용해서 `null`이 아님을 단언하는 경우도 있다.
+접두사가 아닌 접미사로 쓰인 `!` 는 boolean이 아닌 null이 아님을 단언한다는 의미이다.

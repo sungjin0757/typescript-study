@@ -16,10 +16,10 @@
 // const v1 = 'string literal';
 const v2 = 123;
 
-interface Person {
-    first: string;
-    last: string;
-}
+// interface Person {
+//     first: string;
+//     last: string;
+// }
 
 const p:Person = {first: "Sungjin", last: "Hong"};
 
