@@ -471,3 +471,207 @@ const people = ['alice', 'bob', 'jan'].map((name): Person => ({name}));
 
 또한, 자주 쓰이는 특별한 문법(!)을 사용해서 `null`이 아님을 단언하는 경우도 있다.
 접두사가 아닌 접미사로 쓰인 `!` 는 boolean이 아닌 null이 아님을 단언한다는 의미이다.
+
+## Item 10. 객체 래퍼 타입 피하기
+자바스크립트에는 객체 이외에도 기본형 값들에 대한 일곱 가지 타입이 있다.
+기본형들은 불변이며 메서드를 가지지 않는다는 점에서 객체와 구분된다. 그런데 기본형인 `string` 의 경우 메서드를 가지고 있는 것처럼 보인다.
+
+```typescript
+'primitive'.charAt(3);
+```
+하지만 사실 `charAt`은 `string`의 메서드가 아니며, `string` 을 사용할 때
+자바스크립트 내부적으로 많은 동작이 일어난다. `string` 기본형에는 메서드가 없지만, 자바스크립트는 메서드를 가지는 `String` 객체 타입이 정의되어있다.
+자바스크립트는 기본형과 객체형을 자유롭게 변환한다.
+`string` 기본형에 `charAt` 같은 메서드를 사용할 때, 자바스크립트는 기본형을 객체로 매핑하고, 메서드를 호출하고, 마지막에 래핑한 객체를 버린다.
+
+```typescript
+const originalCharAt = String.prototype.charAt;
+String.prototype.charAt = function(pos) {
+    console.log(this, typeof this, pos);
+    return originalCharAt.call(this, pos);
+}
+console.log('primitive'.charAt(3)); // [String: 'primitive'] 'object' 3
+```
+
+메서드 내의 this는 객체 래퍼이다. 객체를 직접 생성할 수도 있으며, 기본형처럼 동작한다.
+그러나 기본형과 객체 래퍼가 항상 동일하게 동작하는 것은 아니다. 예를 들어, 객체는 오직 자신하고만 동일하다.
+
+```typescript
+"hello" === new String("hello"); // false
+new String("hello") === new String("hello"); //false
+```
+
+객체 래퍼 타입의 자동 변환은 종종 당황스러운 동작을 보일 때가 있다. 예를 들어 어떤 속성을 기본형에 할당한다면 그 속성이 사라진다.
+
+```typescript
+var x = "hello";
+x.language = 'English'
+x.language; // false
+```
+실제로는 x가 String 객체로 변환된 후 language 속성이 추가되었고, 속성이 추가된 객체는 버려진 것이다.
+
+다른 기본형에도 동일하게 객체 래퍼 타입이 존재한다.
+이 래퍼 타입들 덕분에 기본형 값에 메서드를 사용할 수 있고, 정적 메서드도 사용할 수 있다. 그러나 보통은 래퍼 객체를 직접 생성할 필요가 없다.
+
+타입스크립트는 기본형과 객체 래퍼 타입을 별도로 모델링한다.
+- string, String
+- number, Number
+- boolean, Boolean
+- symbol, Symbol
+- bigint, BigInt
+
+`string`을 사용할 때는 특히 조심하자. 자바 같은 경우는 `String` 으로 명시되어 있기 때문이다. 또한, 일단은 정상작동 할 수도 있기 때문이다.
+
+```typescript
+function getStringLen(foo: String) {
+    return foo.length;
+}
+
+getStringLen("hello"); //정상
+getStringLen(new String("hello")); //정상
+
+function isGreeting(phrase: String) {
+    return [
+        'hello',
+        'good day'
+    ].includes(phrase); //'String' 형식의 인수는 'string' 형식의 매개 변수에 할당될 수 없습니다.
+    // string'은(는) 기본 개체이지만 'String'은(는) 래퍼 개체입니다. 가능한 경우 'string'을(를) 사용하세요.
+    
+}
+```
+
+기본형은 객체에 할당할 수 있지만, 객체에는 기본형을 할당할 수 없다.
+대부분의 라이브러리와 마찬가지로 타입스크립트가 제공하는 타입 선언은 전부 기본형 타입으로 되어 있다.
+
+래퍼 객체는 타입 구문의 첫 글자를 대문자로 표기하는 방법으로도 사용할 수 있다.
+```typescript
+cons s: String = "primitive";
+```
+당연히 런타입의 값은 객체가 아니고 기본형이다. 그러나 기본형 타입은 객체 래퍼에 할당할 수 있기 때문에 타입스크립트는 기본형 타입을 객체 래퍼에 할당하는 선언을 허용한다.
+그러나 기본형 타입을 객체 래퍼에 할당하는 구문은 오해하기 쉽고, 굳이 그렇게 할 필요도 없다. 
+그냥 기본형을 사용하는 것이 낫다.
+그런데 `new` 없이 객체 `Symbol` 을 호출하는 경우는 기본형을 생성하기 때문에 사용해도 좋다.
+```typescript
+typeof BigInt(25); // "bigint"
+```
+이들은 타입스크립트 타입은 아니다. 앞 예제의 결과는 bigint 타입의 값이 된다.
+
+## Item 11. 잉여 속성 체크의 한계 인지하기
+타입이 명시괸 변수에 객체 리터럴을 할당할 때 타입스크립트는 해당 타입의 속성이 있는지, 그리고 그외의 속성은 없는지 확인한다.
+
+```typescript
+interface Room {
+    numDoors: number;
+    ceilingHeightFt: number;
+}
+const r: Room = {
+    numDoors: 1,
+    ceilingHeightFt: 10,
+    elephant: 'present'  //개체 리터럴은 알려진 속성만 지정할 수 있으며 'Room' 형식에 'elephant'이(가) 없습니다.
+}
+```
+
+구조적 타이핑 관점으로 생각해 보면 오류가 발생하지 않아야한다. 임시 변수를 도입해 보면 알 수 있는데, obj 객체는 `Room` 타입에 할당이 가능하다.
+
+```typescript
+const obj = {
+    numDoors: 1,
+    ceilingHeightFt: 10,
+    elephant: 'present'
+};
+const r: Room = obj; //정상
+```
+
+obj의 타입은 `{numDoors: number, ceilingHeightFt: number, elephant: string}` 으로 추론된다. obj 타입은 Room 타입의 부분 집합을 포함하므로, Room 에 할당 가능하며 타입 체커도 통과한다.
+
+앞의 두 예제의 차이점을 보자. 첫 번째 예제에서는, 구조적 타입 시스템에서 발생할 수 있는 중요한 종류의 오류를 잡을 수 있도록 잉여 속성 체크 과정이 수행되었다.
+그러나 잉여 속성 체크 역시 조건에 따라 동작하지 않는다는 한계가 있고, 구조적 타이핑과 혼란스러울 수 있다.
+잉여 속성 체크가 할당 가능 검사와는 별도의 과정이라는 것을 알아야 타입스크립트 타입 시스템에 대한 개념을 잡을 수 있다.
+
+타입스크립트는 단순히 런타임에 예외를 던지는 코드에 오류를 표시하는 것 뿐 아니라, 의도와 다르게 작성된 코드까지 찾으려 한다.
+
+```typescript
+interface Options {
+    title: string,
+    darkMode?: boolean
+}
+
+function createWindow(options: Options) {
+    if(options.darkMode) {
+        setDarkMode();
+    }
+}
+createWindow({
+    title: 'Spider Solitaire',
+    darkmode: true //개체 리터럴은 알려진 속성만 지정할 수 있지만 'Options' 형식에 'darkmode'이(가) 없습니다. 'darkMode'을(를) 쓰려고 했습니까?
+})
+```
+
+앞의 코드를 실행하면 런타임에 어떠한 종류의 오류도 발생하지 않는다. 그러나 타입스크립트가 알려주는 오류 메시지처럼 의도한 대로 동작하지 않을 수 있다.
+
+Options 타입은 범위가 매우 넓기 때문에, 순수한 구조적 타입 체커는 이런 종류의 오류를 찾아내지 못한다. string 타입은 title 속성과 또다른 어떤 속성을 가지는 모든 객체는 Options 타입의 범위에 속하게 된다. 
+즉, 범위가 아주 넓어질 수 있다.
+```typescript
+const o1: Options = document; //정상
+```
+
+document의 인스턴스가 string 타입인 title속성을 가지고 있기 때문에 할당문은 정상이다.
+
+잉여 속성 체크를 이용하면 기본적으로 타입 시스템의 구조적 본질을 해치지 않으면서 객체 리터럴에 알 수 없는 속성을 허용하지 않음으로, 앞에서 다룬 Room이나 Options와 같은 문제점을 방지할 수 있다.
+
+document는 객체 리터럴이 아니기 때문에 잉여 속성 체크가 되지 않는다. 그러나 
+`{title, darkmode}` 객체는 체크가 된다.
+```typescript
+const o: Options = {title: "title", darkmode: true}; //개체 리터럴은 알려진 속성만 지정할 수 있지만 'Options' 형식에 'darkmode'이(가) 없습니다.
+```
+
+오류가 사라지는 이유를 알아내기 위해 타입 구문 없는 임시 변수를 사용해 보자.
+
+```typescript
+const intermediate = {
+    darkmode: true,
+    title: "title"
+}
+
+const obj2: Options = intermediate;
+```
+
+첫 번째 줄의 오른쪽은 객체 리터럴이지만, 두 번째 줄의 오른쪽은 객체 리터럴이 아니다.
+따라서 잉여 속성 체크가 적용되지 않고 오류는 사라진다.
+잉여 속성 체크는 타입 단언문을 사용할 때에도 적용되지 않는다.
+```typescript
+const o = {
+    darkmode: true,
+    title: "title"
+} as Options // 정상
+```
+
+이 예제가 단언문보다 선언문을 사용해야하는 단적인 이유 중 하나다.
+잉여 속성 체크를 원치 않는다면, 인덱스 시그니처를 사용해서 타입스크립트가 추가적인 속성을 예상하도록 할 수 있다.
+
+```typescript
+interface Options {
+    darkMode?: boolean;
+    [otherOptions: string]: unknown;
+}
+const o: Options = {darkMode: true}; // 정상
+```
+이런 방법이 데이터 모델링하는데 적적한지는 아이템 15에서 다룬다.
+
+선택적 속성만 가지는 약한 타입에도 비슷한 체크가 동작한다.
+
+```typescript
+const opts = {logScale: true};
+const oo: LineChartOptions = opts;  // '{ logScale: boolean; }' 유형에 'LineChartOptions' 유형과 공통적인 속성이 없습니다.
+```
+구조적 관점에서 모든 속성이 선택적이므로 모든 객체를 포함할 수 있다. 이런 약한 타입에 대해서 타입스크립트는 값 타입과 선언 타입에 공통된 속성이 있는지 확인하는 
+별도의 체크를 수행한다.
+공통 속성 체크는 잉여 속성 체크와 마찬가지로 오타를 잡는 데 효과적이며 구조적으로 엄격하지 않다.
+그러나 잉여 속성 체크와 다르게, 약한 타입과 관련된 할당문 마다 수행된다.
+
+잉여 속성 체크는 구조적 타이핑 시스템에서 허용되는 속성 이름의 오타같은 실수를 잡는 데 효과적이다.
+선택적 필드를 포함하는 타입에도 유용하다.
+하지만, 적용 범위도 매우 제한적이며 오직 객체 리터럴에만 적용된다. 이러한 한계점을 인지하고 타입 체크를 구분한다면, 개념을 잡는데에 도움될 것이다.
+
+잉여 속성 체크가 어떻게 버그를 잡고 새로운 설계 가능성을 보여주는지에 대한 구체적인 예제는 18장에서 다룬다.
+또한 임시 상수를 도입함으로써 잉여 속성 체크 문제를 해결하지만, 문맥 관점의 오류를 발생시키는 예제는 26장에서 다룬다.
