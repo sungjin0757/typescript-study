@@ -675,3 +675,98 @@ const oo: LineChartOptions = opts;  // '{ logScale: boolean; }' 유형에 'LineC
 
 잉여 속성 체크가 어떻게 버그를 잡고 새로운 설계 가능성을 보여주는지에 대한 구체적인 예제는 18장에서 다룬다.
 또한 임시 상수를 도입함으로써 잉여 속성 체크 문제를 해결하지만, 문맥 관점의 오류를 발생시키는 예제는 26장에서 다룬다.
+
+## Item 12. 함수 표현식에 타입 적용하기
+자바스크립트에서는 함수 문장과 함수 표현식을 다르게 인식한다.
+
+```typescript
+function rollDice1(sides: number): number {
+    /* ... */  // 문장
+}
+
+const rollDice2 = function(sides: nubmer): number {/* ... */}; // 표현식
+const rollDice3 = (sides: number): number{/* ... */}; // 표현식
+```
+타입스크립트에서는 함수 표현식을 하용하는 것이 좋다.
+함수의 매개변수부터 반환값까지 전체를 함수 타입으로 선언하여 함수 표현식에 재사용할 수 있다는 장점이 있기 때문이다.
+
+함수 타입 선언의 장점을 더 알아보자.
+함수 타입의 선언은 불필요한 코드의 반복을 줄인다. 사칙연산을 하는 함수 네 개는 다음과 같이 작성할 수 있다.
+
+```typescript
+function add(a: number, b: number): number {
+    return a + b;
+}
+function sub(a: number, b: number): number {
+    return a - b;
+}
+function mul(a: number, b: number): number {
+    return a * b;
+}
+function div(a: number, b: number): number {
+    return a / b;
+}
+```
+
+반복되는 함수 시그니처를 하나의 함수 타입으로 통합할 수도 있다.
+```typescript
+type BinaryFn = (a: number, b: number) => number;
+const add: BinaryFn = (a, b) => a + b;
+const sub: BinaryFn = (a, b) => a - b;
+const mul: BinaryFn = (a, b) => a * b;
+const div: BinaryFn = (a, b) => a / b;
+```
+
+이 예제는 함수 타입 선언을 이용했던 예제보다 타입 구문이 적다. 함수 구현부도 분리되어 있어 로직이 보다 분명해진다. 모든 함수 표현식의 반환 타입 까지 number 로 선언한 셈이다.
+
+라이브러리는 공통 함수 시그니처를 타입으로 제공하기도 한다. 예를들어, 리액트는 함수의 매개변수에 명시하는 `MouseEvent` 타입 대신에 함수 전체에 적용할 수 있는
+`MouseEventHandler` 타입을 제공한다.
+
+시그니처가 일치하는 다른 함수가 있을 때도 함수 표현식에 타입을 적용해볼 만 하다.
+예를 들어, 웹브라우저에서 `fetch` 함수는 특정 리소스에 HTTP 요청을 보낸다.
+```typescript
+const responseP = fetch('url');
+```
+
+그리고 형식에 맞춰 응답을 가져온다.
+```typescript
+async function getQuote() {
+    const response = await fetch('url');
+    const quote = response.json();
+    return quote;
+}
+```
+여기애 버그가 존재한다. 만약 url이 존재하지 않는 경로라면 에러가 포함된 내용을 응답하고, json 형식이 아닐 수 있다. 호출한 곳에서는 새로운 오류 메시지가 전달 되어 실제 오류가 감춰질 것이다.
+또한 `fetch` 가 실패하면 거절된 프로미스를 응답하지는 않는다는 걸 간과하기 쉽다.
+그러니 상태를 체크해줄 함수를 작성해보자.
+```typescript
+declare function fetch {
+    input: RequestInfo,
+    Init?: RequestInit
+}: Promise<Response>;
+
+async function checkedFetch(input: RequestInfo, Init?: RequestInit) {
+    const response = await fetch('url');
+    if(!response.ok) {
+        throw new Error(`Request Failed : %{response.status}`);
+    }
+    return response;
+}
+```
+
+이 코드도 잘 동작하지만 다음처럼 더 간결하게 만들 수도 있다.
+```typescript
+const checkedFetch: typeof fetch = async (input, init) => {
+    const response = await fetch('url');
+    if(!response.ok) {
+        throw new Error(`Request Failed : %{response.status}`);
+    }
+    return response;
+}
+```
+함수 문장을 함수 표현식으로 바꿨고 함수 전체에 타입을 적용했다. 이는 타입스크립트가 input 과 init의 타입을 추론할 수 있게 해준다.
+
+타입 구문은 또한 반환타입을 보장하며, fetch 와 동일하다. 예를들어 throw 대신 
+return 을 사용했다면, 타입스크립트는 그 실수를 잡아낸다.
+
+함수의 매개변수에 타입 선언을 하는 것보다 함수 표현식 전체 타입을 정의하는 것이 코드도 간결하고 안전하다. 다른 함수의 시그니처와 동일한 타입을 가지는 새 함수를 작성하거나, 동일한 타입 시그니처를 가지는 여러개의 함수를 작성할 때는 매개변수의 타입과 반환 타입을 반복해서 작성하지 말고 함수 전체의 타입 선언을 적용해야 한다.
