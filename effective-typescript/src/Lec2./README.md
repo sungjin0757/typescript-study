@@ -770,3 +770,175 @@ const checkedFetch: typeof fetch = async (input, init) => {
 return 을 사용했다면, 타입스크립트는 그 실수를 잡아낸다.
 
 함수의 매개변수에 타입 선언을 하는 것보다 함수 표현식 전체 타입을 정의하는 것이 코드도 간결하고 안전하다. 다른 함수의 시그니처와 동일한 타입을 가지는 새 함수를 작성하거나, 동일한 타입 시그니처를 가지는 여러개의 함수를 작성할 때는 매개변수의 타입과 반환 타입을 반복해서 작성하지 말고 함수 전체의 타입 선언을 적용해야 한다.
+
+## Item 13. 타입과 인터페이스의 차이점 알기
+타입스크립트에서 명명된 타입을 정의하는 방법은 두 가지가 있다.
+
+```typescript
+type TState = {
+    name: string;
+    capital: string;
+}
+
+interface IState {
+    name: string;
+    capital: string;
+}
+``` 
+대부분의 경우에는 타입을 사용해도 되고 인터페이스를 사용해도 된다.
+그러나 타입과 인터페이스 사이에 존재하는 차이를 분명하게 알고, 같은 상황에서는 동일한 방법으로 명명된 타입을 정의해 일관성을 유지해야 한다.
+
+먼저, 인터페이스 선언과 타입 선언의 비슷한 점에 대해 알아보자. 명명된 타입은 인터페이스로 정의하는 타입으로 정의하든 상태에는 차이가 없다. 만약 `Istate` 와 `TState` 를 추가 속성과 함께 할당한다면 동일한 오류가 발생한다.
+
+```typescript
+const wyoming: TState = {
+    name: "name",
+    capital: "capital",
+    population: 10 //개체 리터럴은 알려진 속성만 지정할 수 있으며 'TState' 형식에 'population'이(가) 없습니다
+}
+
+const wyoming2: IState = {
+    name: "name",
+    capital: "capital",
+    population: 10 //개체 리터럴은 알려진 속성만 지정할 수 있으며 'TState' 형식에 'population'이(가) 없습니다
+}
+```
+
+인덱스 시그니처는 인터페이스와 타입에서 모두 사용할 수 있다.
+```typescript
+type TDict = {[key: string]: string};
+interface IDict {
+    [key: string]: string
+
+```
+
+또한 함수 타입도 인터페이스나 타입으로 정의할 수 있다.
+```typescript
+type TDict = {[key: string]: string};
+interface IDict {
+    [key: string]: string
+
+```
+
+이런 단순한 함수 타입에는 타입 별칭이 더 나은 선택이 되겠지만, 함수 타입에 추가적인 속성이 있다면 타입이나 인터페이스 어떤 것을 선택하든 차이가 없다.
+
+```typescript
+type TFnWithProperties = {
+    (x: number): number;
+    prop: string;
+}
+
+interface IFnWithProperties {
+    (x: number): number;
+    prop: string;
+}
+```
+문법이 생소할 수도 있지만 자바스크립트에서 함수는 호출 가능한 객체라는 것을 떠올려 보면 납득할 수 있는 코드다.
+타입 별칭과 인터페이스는 모두 제너릭이 가능하다.
+
+```typescript
+type TPair<T> = {
+    first: T;
+    second: T;
+}
+
+interface IPair<T> {
+    first: T;
+    second: T;
+}
+```
+인터페이스는 타입을 확장할 수 있으며, 타입은 인터페이스를 확장할 수 있다.
+
+```typescript
+interface IStateWithPop extends TState {
+    population: number;
+}
+type TStateWithPop = IState & {population: number};
+```
+위의 둘의 코드는 동일하다. 여기서 주의할 점은 인터페이스는 유니온 타입 같은 복잡한 타입을 확장하지는 못한다는 것이다. 복잡한 타입을 확장하고 싶다면 타입과 & 를 사용해야 한다.
+
+클래스를 구현할 때는, 타입과 인터페이스를 둘 다 사용할 수 있다.
+```typescript
+
+class StateT implements TState {
+    name: string = '';
+    capital: string = '';
+}
+class StateI implements IState {
+    name: string = '';
+    capital: string = '';
+}
+```
+지금까지 타입과 인터페이스의 비슷한 점을 살펴보았다. 이제부터는 다른 점을 알아보자.
+
+유니온 타입은 있지만 유니온 인터페이스라는 개념은 없다.
+```typescript
+type AorB = 'a' | 'b';
+```
+인터페이스는 타입을 확장할 수 있지만, 유니온은 할 수 없다.
+그런데 유니온 타입을 확장하는 게 필요할 때도 있다.
+
+```typescript
+type Input = {/** */};
+type Output = {/** */};
+interface VariableMap {
+    [name: string]: Input | Output;
+}
+```
+또는 유니온 타입에 name 속성을 붙인 타입을 만들 수도 있다.
+```typescript
+type NamedVariable = (Input | Output) & {name: string};
+```
+이 타입은 인터페이스로 표현할 수 없다. tpye 키워드는 일반적으로 interface 보다 쓰임새가 많다.
+type은 유니온이 될 수도 있고, 매핑된 타입 또는 조건부 타입 같은 고급 기능에 활용할 수도 있다.
+튜플과 배열타입도 type을 활용해 더 간결하게 표현할 수 있다.
+
+```typescript
+type Pair = [number, number];
+type StringList = string[];
+type NamedNums = [string, ...number[]];
+```
+인터페이스도 튜플과 비슷하게 구현할 수 있기는 하다.
+
+```typescript
+interface Tuple {
+    0: number;
+    1: number;
+    length: 2;
+}
+```
+그러나 인터페이스로 튜플과 비슷하게 구현하면 튜플에서 사용할 수 있는 concat 같은 메서드들을 사용할 수 없다.
+그러므로 튜플은 type 키워드로 구현하는 것이 낫다.
+
+반면, 인터페이스는 타입에 없는 몇 가지 기능이 있다. 그 중 하나는 바로 보강이 가능하다는 것이다.
+
+```typescript
+interface IState {
+    name: string;
+    capital: string;
+}
+
+interface IState {
+    population: number;
+}
+
+const wyoming2: IState = {
+    name: "name",
+    capital: "capital",
+    population: 10 //정상
+}
+```
+이 예제처럼 속성을 확장하는 것을 선언 병합이라고 한다.
+
+타입 선언 파일을 작성할 때는 선언 병합을 지원하기 위해 반드시 인터페이스를 사용해야 하며 표준을 따라야 한다. 타입 선언에는 사용자가 채워야 하는 빈틈이 있을 수 있는데, 바로 이 선언 병합이 그렇다.
+
+타입스크립트는 여러 버전의 자바스크립트 표준 라이브러리에서 여러 타입을 모아 병합한다.
+
+병합은 선언처럼 일반적인 코드라서 언제든지 가능하다는 것을 알고 있어야한다. 그러므로 프로퍼티가 추가되는 것을 원하기 않는다면 인터페이스 대신 타입을 사용해야 한다.
+
+타입과 인터페이스 중 어떤 것을 사용해야 하는지는 다음과 같다.
+- 복잡한 타입이면 타입 별칭을 사용해야한다.
+- 간단한 타입이면 보강의 관점에서 고려해 봐야한다. 일관된 타입을 고르면 된다.
+- 아직 스타일이 확립되지 않은 프로젝트라면, 향후에 보강의 가능성이 있는지 확인해 봐야 한다. 
+  - API 에 대한 타입 선언을 작성해야 한다면 인터페이스.
+  - 프로젝트 내부적으로 사용되는 타입에 선언 병합은 잘못된 설계이므로 타입을 사용해야한다.
