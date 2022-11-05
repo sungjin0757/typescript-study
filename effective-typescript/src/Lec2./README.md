@@ -942,3 +942,168 @@ const wyoming2: IState = {
 - 아직 스타일이 확립되지 않은 프로젝트라면, 향후에 보강의 가능성이 있는지 확인해 봐야 한다. 
   - API 에 대한 타입 선언을 작성해야 한다면 인터페이스.
   - 프로젝트 내부적으로 사용되는 타입에 선언 병합은 잘못된 설계이므로 타입을 사용해야한다.
+  - 
+
+## Item 14. 타입 연산과 제너릭 사용으로 반복 줄이기
+다음은 원기둥의 반지름과 높이, 표면적, 부피를 출력하는 코드다.
+
+```typescript
+console.log('Cylinder 1 X 1',
+'Surface area : ', 6.283185 * 1 * 1 + 6.283185 * 1 * 1,
+'Volume : ', 3.14159 * 1 * 1);
+
+console.log('Cylinder 1 X 2',
+'Surface area : ', 6.283185 * 1 * 1 + 6.283185 * 2 * 1,
+'Volume : ', 3.14159 * 2 * 1);
+```
+비슷한 코드가 반복되어 있어 보기 불편하다. 값과 상수가 반복되는 바람에 드러나지 않은 오류까지 가지고 있다.
+
+이 코드에서 함수, 상수, 루프의 반복을 제거해 코드를 개선해 보자.
+
+```typescript
+const surfaceArea = (r, h) => 2 * Math.PI * r * (r + h);
+const volume = (r, h) => Math.PI * r * r * h;
+for (const [r, h] of [[1, 1], [1, 2], [2, 1]]) {
+    console.log(
+        `Cylinder ${r} * ${h}`,
+        `Surface area : ${surfaceArea(r, h)}`,
+        `Volume : ${volume(r, h)}`
+    )
+}
+```
+
+이게 바로 같은 코드를 반복하지 말라는 DRY(don't repeat yourself) 원칙이다.
+
+반복된 코드를 열심히 제거하며 DRY 원칙을 지켜왔던 개발자라도 타입에 대해서는 간과했을지 모른다.
+
+```typescript
+interface Person {
+    firstName: string;
+    lastName: string;
+}
+
+interface PersonWithBirthDate {
+    firstName: string;
+    lastName: string;
+    birth: Date;
+}
+```
+
+타입 중복은 코드 중복만큼 많은 문제를 발생시킨다. 예를 들어 선택적 필드인
+middleName 을 Person에 추가해본다고 하자.
+그러면 Person과 PersonWithBirthDate 는 다른 타입이 된다.
+
+타입에서 중복이 더 흔한 이유 중 하나는 공유된 패턴을 제거하는 메커니즘이 기존 코드에서 하던 것과 비교해 덜 익숙하기 때문이다.
+
+타입간에 매핑하는 방법을 익히면, 타입 정의에서도 DRY 의 장점을 적용할 수 있다.
+
+반복을 줄이는 가장 간단한 방법은 타입에 이름을 붙이는 것이다.
+
+```typescript
+
+function distance(a: {x: number, y: number}, b: {x:number, y: number}) {
+    return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+}
+```
+
+위와 같은 코드가 있다. 코드를 수정해 타입에 이름을 붙여보자.
+
+```typescript
+function distanceV2(a: Point2D, b: Point2D) {
+    /* .. */
+}
+```
+
+이 코드는 상수를 사용해서 반복을 줄이는 기법을 동아ㅣㄹ하게 타입 시스템에 적용한 것이다.
+
+중복된 타입은 종종 문법에 의해서 가려지기도 한다. 예를 들어, 몇몇 함수가 같은 타입 시그니처를 공유하고 있다고 해 보자.
+
+```typescript
+function get(url: string, opts: Options): Promise<Response> {
+/* .. */
+}
+function post(url: string, opts: Options): Promise<Response> {
+    /* .. */
+}
+```
+
+그러면 해당 시그니처를 명명된 타입으로 분리할 수 있다.
+
+```typescript
+type HttpFunction = (url: string, opts: OPtions) => Promise<Response>;
+const get: HttpFunction = (url, opts) => {/* .. */};
+const post: HttpFunction = (url, opts) => {/* .. */};
+```
+
+Person/PersonWithBirthDate 예제에서는 한 인터페이스가 다른 인터페이스를 확장하게 해서 반복을 제거할 수 있다.
+
+```typescript
+interface Person {
+    firstName: string;
+    lastName: string;
+}
+
+interface PersonWithBirthDate extends Person {
+    birth: Date;
+}
+```
+
+이제 추가적인 필드만 작성하면 된다. 만약 두 인터페이스가 필드의 부분 집합을 공유한다면, 공통 필드만 골라서 기반 클래스로 분리해낼 수 있다.
+
+이미 존재하는 타입을 확장하는 경우에 인터섹션 연산자를 사용할 수 있다.
+```typescript
+type PersonWithBirthDate = Person & {birth: Date};
+```
+
+이제 다른 측면을 생각해 보자. 전체 애플리케이션의 상태를 표현하는 State 타입과 단지 부분만 표현하는 TopNavState 가 있는 경우를 살펴보자.
+
+```typescript
+interface State {
+    userId: string;
+    pageTitle: string;
+    recentFiles: string[];
+    pageContents: string;
+}
+
+interface TopNavState {
+    userId: string;
+    pageTitle: string;
+    recentFiles: string[];
+}
+```
+
+TopNavState 를 확장하여 State를 구성하기보다, State의 부분 집합으로 TopNavState를 정의하는 것이 밯람직해 보인다.
+
+State를 인덱싱하여 속성의 타입에서 중복을 제거할 수 있다.
+
+```typescript
+type TopNavState = {
+    userId: State['userId'];
+    pageTitle: State['pageTitle'];
+    recentFiles: State['recentFiles'];
+}
+```
+
+중복 제거는 아직 끝나지 않았다. State 내의 pageTitle의 타입이 바뀌면 TopNavState에도 반영된다.
+그러나 여전히 반복되는 코드가 존재한다. 이때, 매핑된 타입을 사용하면 좀 더 나아진다.
+
+```typescript
+type TopNavState = {
+    [k in 'userId' | 'pageTitle' | 'recentFiles']: State[k]
+}
+```
+
+매핑된 타입은 배열의 필드를 루프 도는 것과 같은 방식이다. 이 패턴은 표준 라이브러리에서도 일반적으로 찾을 수 있으며, Pick 이라고 한다.
+
+```typescript
+type Pick<T, K> = {[K in K] : T[K]};
+```
+
+정의가 완전하지는 않지만 다음과 같이 사용할 수 있다.
+
+```typescript
+type TopNavState = Pick<State, 'userId' | 'pageTitle' | 'recentFiles'>;
+```
+
+여기서 Pick은 제너릭 타입이다. 중복된 코드를 없앤다는 관점으로, Pick을 사용하는 것은 함수를 호출하는 것에 비유할 수 있다.
+마치 함수에서 두 개의 매개변수 값을 받아서 결괏값을 반화하는 것처럼, Pick 은 T 와 K 두 가지 타입을 받아서 결과 타입을 반환한다.
