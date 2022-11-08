@@ -1107,3 +1107,129 @@ type TopNavState = Pick<State, 'userId' | 'pageTitle' | 'recentFiles'>;
 
 여기서 Pick은 제너릭 타입이다. 중복된 코드를 없앤다는 관점으로, Pick을 사용하는 것은 함수를 호출하는 것에 비유할 수 있다.
 마치 함수에서 두 개의 매개변수 값을 받아서 결괏값을 반화하는 것처럼, Pick 은 T 와 K 두 가지 타입을 받아서 결과 타입을 반환한다.
+
+태그된 유니온에서도 다른 형태의 중복이 발생할 수 있다. 그런데 단순히 태그를 붙이기 위해서 타입을 사용한다면 어떨지 생각해보자.
+
+```typescript
+interface SaveAction {
+    type: 'save';
+}
+
+interface LoadAction {
+    type: 'load';
+}
+type Action = SaveAction | LoadAction;
+type ActionType = 'save' | 'load';
+```
+
+Action 유니온을 인덱싱하면 타입 반복 없이 ActionType을 정의할 수 있다.
+
+```typescript
+type ActionType = Action['type'];
+```
+
+Action 유니온에 타입을 더 추가하면 ActionType은 자동적으로 그 타입을 포함한다.
+ActionType은 Pick을 사용하여 얻게 되는, type 속성을 가지는 인터페이스와는 다르다.
+
+```typescript
+type ActionRec = Pick<Action, 'type'>;
+```
+한편 생성하고 난 다음에 업데이트가 되는 클래스를 정의한다면, update 메서드 매개변수의 타입은 생성자와 동일한 매개변수이면서, 타입 대부분이 선택적 필드가 되게 된다.
+
+```typescript
+interface Options {
+    width: number;
+    height: number;
+    color: string;
+    label: string;
+}
+interface OptionUpdate {
+    width?: number;
+    height?: number;
+    color?: number;
+    label?: number;
+}
+class UIWidget {
+    constructor(init: Options) {
+        /* .. */
+    }
+    update(options: OptionUpdate) {
+        /* .. */
+    }
+}
+```
+매핑된 타입과 keyof를 사용하면 Options으로 부터 OptionsUpdate를 만들수 있다.
+
+```typescript
+type OptionUpdate = {[k in keyof Options]?: Options[k]};
+```
+
+값의 형태에 해당하는 타입을 정의하고 싶을 때도 있다.
+
+```typescript
+const INIT_OPTIONS = {
+    width: 640,
+    height: 400,
+    color: '#00FF00',
+    label: 'VGA'
+};
+
+type Options = typeof INIT_OPTIONS;
+```
+이 코드는 자바스크립트의 런타임 연산자 typeof를 사용한 것처럼 보이지만, 실제로는 타입스크립트 단계에서 연산되며 훨씬 더 정확하게 타입을 표현한다.
+
+함수나 메서드의 반환 값에 명명된 타입을 만들고 싶을 때도 있다.
+
+```typescript
+function getUserInfo(userId: string) {
+    // ...
+    return {
+        userId,
+        name,
+        age,
+        height.
+        weight,
+        favoriteColor
+    };
+};
+// 추론된 반환 타입은 {userId: string, name: string, age: number ...}\
+```
+이때는 조건부 타입이 필요하다. 그러나 앞에서 살펴본 것처럼 표준 라이브러리에는 이러한 일반적 패턴의 제너릭 타입이 정의되어 있다.
+이런 경우 ReturnType 제너릭이 정확히 들어맞는다.
+
+```typescript
+type userInfo = ReturnType<typeof getUserInfo>;
+```
+
+제너릭 타입에서 매개변수를 제한할 수 있는 방법은 extends를 사용하는 것이다.
+```typescript
+interface Name {
+    first: string;
+    last: string;
+}
+type DancingCuo<T extends Name> = [T, T];
+
+const couple1: DancingDuo<Name> = [
+    {first: "a", last: "b"},
+    {first: "c", last: "d"}
+]; //ok
+
+const couple2: DancingDuo<first: string> = [
+    {first: "s"},
+    {first: "aa"}
+]; // last 속성이 없으므로 오류
+```
+
+```typescript
+type Pick<T, K> = {
+    [K in K]: T[k]
+}; // K 타입은 할당할 수 없습니다.
+```
+K는 T 타입과 무관하고 범위가 너무 넓다. K는 인덱스로 사용될 수 있는 string| number | symbol 이 되어야 하며 실제로는 범위를 조금 더 좁힐 수 있다.
+
+```typescript
+type Pick<T, K extends keyof T> = {
+    [k in k]: T[k]
+}; // 정상
+```
+타입이 값의 집합이라는 관점에서 생각하면 extends를 확장이 아니라 부분 집합이라는 것 이해하는데 도움된다.
