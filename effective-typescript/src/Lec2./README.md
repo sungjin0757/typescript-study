@@ -1233,3 +1233,90 @@ type Pick<T, K extends keyof T> = {
 }; // 정상
 ```
 타입이 값의 집합이라는 관점에서 생각하면 extends를 확장이 아니라 부분 집합이라는 것 이해하는데 도움된다.
+
+## 🌈 Item 15. 동적 데이터에 인덱스 시그니처 사용하기
+자바스크립트의 장점 중 하나는 바로 객체를 생성하는 문법이 간단하다는 것이다.
+
+```typescript
+const rocket = {
+    name: 'a',
+    variant: 'b',
+    thrust: 'c'
+};
+```
+자바스크립트 객체는 문자열 키를 타입의 값에 관계없이 매핑한다.
+타입스크립트에서는 타입에 인덱스 시그니처를 명시하여 유연하게 매핑을 표현할 수 있다.
+
+```typescript
+type Rocket = {[property: string]: string};
+```
+이는 인덱스 시그니처이며, 다음 세가지 의미를 담는다.
+- 키의 이름 : 키의 위치만 표시ㅘ는 용도
+- 키의 타입 : string이나 number 또는 symbol의 조합, 보통은 string 시용
+- 값의 타입 : 어떤 것이든 될 수 있다.
+
+이렇게 타입 체크가 수행되면 네 가지 단점이 드러난다.
+- 잘못된 키를 포함해 모든 키를 허용한다. name 대신 Name
+- 특정 키가 필요하지 않다. {} 도 유효한 타입이다.
+- 키마다 다른 타입을 가질 수 없다.
+- 자동완성 기능이 동작하지 않는다.
+
+인덱스 시그니처는 부정확하므로 더 나은 방법을 찾아야한다. 예를 들어 Rocket은 인터페이스여야한다.
+
+```typescript
+interface Rocket {
+    name: string;
+    variant: string;
+    thrust_KN: number;
+};
+```
+타입스크립트는 모든 필수 필드가 존재하는지 확인한다. 이제 타입스크립트에서 제공하는 언어 서비스를 모두 사용할 수 있게 되었다.
+
+인덱스 시그니처는 동적 데이터를 표현할 때 사용한다. 일반적인 상황에서 열 이름이 무엇인지 미리 알 방법은 없다. 반면에 열 이름을 알고 있는 특정 상황에서는 미리 선언해 둔 타입으로 단언문을 사용한다.
+
+```typescript
+function parseCSV(input: string): {[columnName: string]: string}[] {
+    /** */
+    return rows.map(rowStr => {
+        const row: {[columnName: string]: string} = {};
+        rowStr.split('.').forEach((cell, i) => {
+            row[headerColumns[i]] = cell;
+        });
+        return row;
+    });
+};
+```
+
+```typescript
+interface ProductRow {
+    productId: string;
+    name: string;
+    price: string;
+}
+
+declare let csvData: string;
+const products = parseCSV(csvData) as unknown as ProductRow[];
+```
+
+선언해 둔 열들이 런타임에 실제로 일치한다는 보장은 없다. 이 부분이 걱정된다면 값 타입에 undefined를 추가할 수 있다.
+
+```typescript
+function parseCSV(input: string): {[columnName: string | undefined]: string}[]
+```
+
+연관 배열의 경우, 객체에 인덱스 시그니처를 사용하는 대신 Map 타입을 사용하는 것을 고려할 수 있다.
+
+어떤 타입에 가능한 필드가 제한되어 있는 경우라면 인덱스 시그니처로 모델링하지 말아야 한다.
+예를 들어 데이터에 A, B, C, D 같은 키가 있지만, 얼마나 많이 있는지 모른다면 선택적 필드 또는 유니온 타입으로 모델링하면 된다.
+
+string 타입이 너무 광범위해서 인덱스 시그니처를 사용하는 데 문제가 있다면, 두 가지 다른 대안을 생각해볼 수 있다.
+
+첫 번째 Record를 사용하는 방법이다. Record는 키 타입에 유연성을 제공하는 제너릭 타입이다.
+```typescript
+type Vec3D = Record<'x' | 'y' | 'z'>, number>;
+```
+
+두 번째, 매핑된 타입을 사용하는 방법이다.
+```typescript
+type Vec3D = {[k in 'x' | 'y' | 'z']: number};
+```
