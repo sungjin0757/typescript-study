@@ -941,4 +941,477 @@ const wyoming2: IState = {
 - 간단한 타입이면 보강의 관점에서 고려해 봐야한다. 일관된 타입을 고르면 된다.
 - 아직 스타일이 확립되지 않은 프로젝트라면, 향후에 보강의 가능성이 있는지 확인해 봐야 한다. 
   - API 에 대한 타입 선언을 작성해야 한다면 인터페이스.
+<<<<<<< HEAD
   - 프로젝트 내부적으로 사용되는 타입에 선언 병합은 잘못된 설계이므로 타입을 사용해야한다
+=======
+  - 프로젝트 내부적으로 사용되는 타입에 선언 병합은 잘못된 설계이므로 타입을 사용해야한다.
+  - 
+
+## Item 14. 타입 연산과 제너릭 사용으로 반복 줄이기
+다음은 원기둥의 반지름과 높이, 표면적, 부피를 출력하는 코드다.
+
+```typescript
+console.log('Cylinder 1 X 1',
+'Surface area : ', 6.283185 * 1 * 1 + 6.283185 * 1 * 1,
+'Volume : ', 3.14159 * 1 * 1);
+
+console.log('Cylinder 1 X 2',
+'Surface area : ', 6.283185 * 1 * 1 + 6.283185 * 2 * 1,
+'Volume : ', 3.14159 * 2 * 1);
+```
+비슷한 코드가 반복되어 있어 보기 불편하다. 값과 상수가 반복되는 바람에 드러나지 않은 오류까지 가지고 있다.
+
+이 코드에서 함수, 상수, 루프의 반복을 제거해 코드를 개선해 보자.
+
+```typescript
+const surfaceArea = (r, h) => 2 * Math.PI * r * (r + h);
+const volume = (r, h) => Math.PI * r * r * h;
+for (const [r, h] of [[1, 1], [1, 2], [2, 1]]) {
+    console.log(
+        `Cylinder ${r} * ${h}`,
+        `Surface area : ${surfaceArea(r, h)}`,
+        `Volume : ${volume(r, h)}`
+    )
+}
+```
+
+이게 바로 같은 코드를 반복하지 말라는 DRY(don't repeat yourself) 원칙이다.
+
+반복된 코드를 열심히 제거하며 DRY 원칙을 지켜왔던 개발자라도 타입에 대해서는 간과했을지 모른다.
+
+```typescript
+interface Person {
+    firstName: string;
+    lastName: string;
+}
+
+interface PersonWithBirthDate {
+    firstName: string;
+    lastName: string;
+    birth: Date;
+}
+```
+
+타입 중복은 코드 중복만큼 많은 문제를 발생시킨다. 예를 들어 선택적 필드인
+middleName 을 Person에 추가해본다고 하자.
+그러면 Person과 PersonWithBirthDate 는 다른 타입이 된다.
+
+타입에서 중복이 더 흔한 이유 중 하나는 공유된 패턴을 제거하는 메커니즘이 기존 코드에서 하던 것과 비교해 덜 익숙하기 때문이다.
+
+타입간에 매핑하는 방법을 익히면, 타입 정의에서도 DRY 의 장점을 적용할 수 있다.
+
+반복을 줄이는 가장 간단한 방법은 타입에 이름을 붙이는 것이다.
+
+```typescript
+
+function distance(a: {x: number, y: number}, b: {x:number, y: number}) {
+    return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
+}
+```
+
+위와 같은 코드가 있다. 코드를 수정해 타입에 이름을 붙여보자.
+
+```typescript
+function distanceV2(a: Point2D, b: Point2D) {
+    /* .. */
+}
+```
+
+이 코드는 상수를 사용해서 반복을 줄이는 기법을 동아ㅣㄹ하게 타입 시스템에 적용한 것이다.
+
+중복된 타입은 종종 문법에 의해서 가려지기도 한다. 예를 들어, 몇몇 함수가 같은 타입 시그니처를 공유하고 있다고 해 보자.
+
+```typescript
+function get(url: string, opts: Options): Promise<Response> {
+/* .. */
+}
+function post(url: string, opts: Options): Promise<Response> {
+    /* .. */
+}
+```
+
+그러면 해당 시그니처를 명명된 타입으로 분리할 수 있다.
+
+```typescript
+type HttpFunction = (url: string, opts: OPtions) => Promise<Response>;
+const get: HttpFunction = (url, opts) => {/* .. */};
+const post: HttpFunction = (url, opts) => {/* .. */};
+```
+
+Person/PersonWithBirthDate 예제에서는 한 인터페이스가 다른 인터페이스를 확장하게 해서 반복을 제거할 수 있다.
+
+```typescript
+interface Person {
+    firstName: string;
+    lastName: string;
+}
+
+interface PersonWithBirthDate extends Person {
+    birth: Date;
+}
+```
+
+이제 추가적인 필드만 작성하면 된다. 만약 두 인터페이스가 필드의 부분 집합을 공유한다면, 공통 필드만 골라서 기반 클래스로 분리해낼 수 있다.
+
+이미 존재하는 타입을 확장하는 경우에 인터섹션 연산자를 사용할 수 있다.
+```typescript
+type PersonWithBirthDate = Person & {birth: Date};
+```
+
+이제 다른 측면을 생각해 보자. 전체 애플리케이션의 상태를 표현하는 State 타입과 단지 부분만 표현하는 TopNavState 가 있는 경우를 살펴보자.
+
+```typescript
+interface State {
+    userId: string;
+    pageTitle: string;
+    recentFiles: string[];
+    pageContents: string;
+}
+
+interface TopNavState {
+    userId: string;
+    pageTitle: string;
+    recentFiles: string[];
+}
+```
+
+TopNavState 를 확장하여 State를 구성하기보다, State의 부분 집합으로 TopNavState를 정의하는 것이 밯람직해 보인다.
+
+State를 인덱싱하여 속성의 타입에서 중복을 제거할 수 있다.
+
+```typescript
+type TopNavState = {
+    userId: State['userId'];
+    pageTitle: State['pageTitle'];
+    recentFiles: State['recentFiles'];
+}
+```
+
+중복 제거는 아직 끝나지 않았다. State 내의 pageTitle의 타입이 바뀌면 TopNavState에도 반영된다.
+그러나 여전히 반복되는 코드가 존재한다. 이때, 매핑된 타입을 사용하면 좀 더 나아진다.
+
+```typescript
+type TopNavState = {
+    [k in 'userId' | 'pageTitle' | 'recentFiles']: State[k]
+}
+```
+
+매핑된 타입은 배열의 필드를 루프 도는 것과 같은 방식이다. 이 패턴은 표준 라이브러리에서도 일반적으로 찾을 수 있으며, Pick 이라고 한다.
+
+```typescript
+type Pick<T, K> = {[K in K] : T[K]};
+```
+
+정의가 완전하지는 않지만 다음과 같이 사용할 수 있다.
+
+```typescript
+type TopNavState = Pick<State, 'userId' | 'pageTitle' | 'recentFiles'>;
+```
+
+여기서 Pick은 제너릭 타입이다. 중복된 코드를 없앤다는 관점으로, Pick을 사용하는 것은 함수를 호출하는 것에 비유할 수 있다.
+마치 함수에서 두 개의 매개변수 값을 받아서 결괏값을 반화하는 것처럼, Pick 은 T 와 K 두 가지 타입을 받아서 결과 타입을 반환한다.
+
+태그된 유니온에서도 다른 형태의 중복이 발생할 수 있다. 그런데 단순히 태그를 붙이기 위해서 타입을 사용한다면 어떨지 생각해보자.
+
+```typescript
+interface SaveAction {
+    type: 'save';
+}
+
+interface LoadAction {
+    type: 'load';
+}
+type Action = SaveAction | LoadAction;
+type ActionType = 'save' | 'load';
+```
+
+Action 유니온을 인덱싱하면 타입 반복 없이 ActionType을 정의할 수 있다.
+
+```typescript
+type ActionType = Action['type'];
+```
+
+Action 유니온에 타입을 더 추가하면 ActionType은 자동적으로 그 타입을 포함한다.
+ActionType은 Pick을 사용하여 얻게 되는, type 속성을 가지는 인터페이스와는 다르다.
+
+```typescript
+type ActionRec = Pick<Action, 'type'>;
+```
+한편 생성하고 난 다음에 업데이트가 되는 클래스를 정의한다면, update 메서드 매개변수의 타입은 생성자와 동일한 매개변수이면서, 타입 대부분이 선택적 필드가 되게 된다.
+
+```typescript
+interface Options {
+    width: number;
+    height: number;
+    color: string;
+    label: string;
+}
+interface OptionUpdate {
+    width?: number;
+    height?: number;
+    color?: number;
+    label?: number;
+}
+class UIWidget {
+    constructor(init: Options) {
+        /* .. */
+    }
+    update(options: OptionUpdate) {
+        /* .. */
+    }
+}
+```
+매핑된 타입과 keyof를 사용하면 Options으로 부터 OptionsUpdate를 만들수 있다.
+
+```typescript
+type OptionUpdate = {[k in keyof Options]?: Options[k]};
+```
+
+값의 형태에 해당하는 타입을 정의하고 싶을 때도 있다.
+
+```typescript
+const INIT_OPTIONS = {
+    width: 640,
+    height: 400,
+    color: '#00FF00',
+    label: 'VGA'
+};
+
+type Options = typeof INIT_OPTIONS;
+```
+이 코드는 자바스크립트의 런타임 연산자 typeof를 사용한 것처럼 보이지만, 실제로는 타입스크립트 단계에서 연산되며 훨씬 더 정확하게 타입을 표현한다.
+
+함수나 메서드의 반환 값에 명명된 타입을 만들고 싶을 때도 있다.
+
+```typescript
+function getUserInfo(userId: string) {
+    // ...
+    return {
+        userId,
+        name,
+        age,
+        height.
+        weight,
+        favoriteColor
+    };
+};
+// 추론된 반환 타입은 {userId: string, name: string, age: number ...}\
+```
+이때는 조건부 타입이 필요하다. 그러나 앞에서 살펴본 것처럼 표준 라이브러리에는 이러한 일반적 패턴의 제너릭 타입이 정의되어 있다.
+이런 경우 ReturnType 제너릭이 정확히 들어맞는다.
+
+```typescript
+type userInfo = ReturnType<typeof getUserInfo>;
+```
+
+제너릭 타입에서 매개변수를 제한할 수 있는 방법은 extends를 사용하는 것이다.
+```typescript
+interface Name {
+    first: string;
+    last: string;
+}
+type DancingCuo<T extends Name> = [T, T];
+
+const couple1: DancingDuo<Name> = [
+    {first: "a", last: "b"},
+    {first: "c", last: "d"}
+]; //ok
+
+const couple2: DancingDuo<first: string> = [
+    {first: "s"},
+    {first: "aa"}
+]; // last 속성이 없으므로 오류
+```
+
+```typescript
+type Pick<T, K> = {
+    [K in K]: T[k]
+}; // K 타입은 할당할 수 없습니다.
+```
+K는 T 타입과 무관하고 범위가 너무 넓다. K는 인덱스로 사용될 수 있는 string| number | symbol 이 되어야 하며 실제로는 범위를 조금 더 좁힐 수 있다.
+
+```typescript
+type Pick<T, K extends keyof T> = {
+    [k in k]: T[k]
+}; // 정상
+```
+타입이 값의 집합이라는 관점에서 생각하면 extends를 확장이 아니라 부분 집합이라는 것 이해하는데 도움된다.
+
+## 🌈 Item 15. 동적 데이터에 인덱스 시그니처 사용하기
+자바스크립트의 장점 중 하나는 바로 객체를 생성하는 문법이 간단하다는 것이다.
+
+```typescript
+const rocket = {
+    name: 'a',
+    variant: 'b',
+    thrust: 'c'
+};
+```
+자바스크립트 객체는 문자열 키를 타입의 값에 관계없이 매핑한다.
+타입스크립트에서는 타입에 인덱스 시그니처를 명시하여 유연하게 매핑을 표현할 수 있다.
+
+```typescript
+type Rocket = {[property: string]: string};
+```
+이는 인덱스 시그니처이며, 다음 세가지 의미를 담는다.
+- 키의 이름 : 키의 위치만 표시ㅘ는 용도
+- 키의 타입 : string이나 number 또는 symbol의 조합, 보통은 string 시용
+- 값의 타입 : 어떤 것이든 될 수 있다.
+
+이렇게 타입 체크가 수행되면 네 가지 단점이 드러난다.
+- 잘못된 키를 포함해 모든 키를 허용한다. name 대신 Name
+- 특정 키가 필요하지 않다. {} 도 유효한 타입이다.
+- 키마다 다른 타입을 가질 수 없다.
+- 자동완성 기능이 동작하지 않는다.
+
+인덱스 시그니처는 부정확하므로 더 나은 방법을 찾아야한다. 예를 들어 Rocket은 인터페이스여야한다.
+
+```typescript
+interface Rocket {
+    name: string;
+    variant: string;
+    thrust_KN: number;
+};
+```
+타입스크립트는 모든 필수 필드가 존재하는지 확인한다. 이제 타입스크립트에서 제공하는 언어 서비스를 모두 사용할 수 있게 되었다.
+
+인덱스 시그니처는 동적 데이터를 표현할 때 사용한다. 일반적인 상황에서 열 이름이 무엇인지 미리 알 방법은 없다. 반면에 열 이름을 알고 있는 특정 상황에서는 미리 선언해 둔 타입으로 단언문을 사용한다.
+
+```typescript
+function parseCSV(input: string): {[columnName: string]: string}[] {
+    /** */
+    return rows.map(rowStr => {
+        const row: {[columnName: string]: string} = {};
+        rowStr.split('.').forEach((cell, i) => {
+            row[headerColumns[i]] = cell;
+        });
+        return row;
+    });
+};
+```
+
+```typescript
+interface ProductRow {
+    productId: string;
+    name: string;
+    price: string;
+}
+
+declare let csvData: string;
+const products = parseCSV(csvData) as unknown as ProductRow[];
+```
+
+선언해 둔 열들이 런타임에 실제로 일치한다는 보장은 없다. 이 부분이 걱정된다면 값 타입에 undefined를 추가할 수 있다.
+
+```typescript
+function parseCSV(input: string): {[columnName: string | undefined]: string}[]
+```
+
+연관 배열의 경우, 객체에 인덱스 시그니처를 사용하는 대신 Map 타입을 사용하는 것을 고려할 수 있다.
+
+어떤 타입에 가능한 필드가 제한되어 있는 경우라면 인덱스 시그니처로 모델링하지 말아야 한다.
+예를 들어 데이터에 A, B, C, D 같은 키가 있지만, 얼마나 많이 있는지 모른다면 선택적 필드 또는 유니온 타입으로 모델링하면 된다.
+
+string 타입이 너무 광범위해서 인덱스 시그니처를 사용하는 데 문제가 있다면, 두 가지 다른 대안을 생각해볼 수 있다.
+
+첫 번째 Record를 사용하는 방법이다. Record는 키 타입에 유연성을 제공하는 제너릭 타입이다.
+```typescript
+type Vec3D = Record<'x' | 'y' | 'z'>, number>;
+```
+
+두 번째, 매핑된 타입을 사용하는 방법이다.
+```typescript
+type Vec3D = {[k in 'x' | 'y' | 'z']: number};
+```
+
+## 🌈 Item 16. number 인덱스 시그니처보다는 Array, 튜플, ArrayLike를 사용하기
+자바스크립트는 이상하게 동작하기로 유명한 언어이다. 그 중 가장 악명 높은 것은 암시적 타입 강제와 관련된 부분이다.
+```typescript
+"0" == 0 // true
+```
+다행히도 암시적 타입 강제와 관련된 문제는 대부분 === 와 !==를 사용해서 해결이 가능하다.
+
+자바스크립트 객체 모델에도 이상한 부분들이 있으며, 이 중 일부는 타입스크립트 타입 시스템으로 모델링 되기 때문에 자바스크립트 객체 모델을 이해하는 것이 중요하다.
+
+자바스크립트에서 객체란 키/값 쌍의 모음이다. 키는 보통 문자열이다. 그리고 값은 어떤 것이든 될 수 있다.
+
+파이썬이나 자바에서 볼 수 있는 해시 가능 객체라는 표현이 자바스크립트에는 없다.
+만약 더 복잡한 객체를 키로 사용하려고 하면, toString 메서드가 호출되어 객체가 문자열로 변환된다.
+```typescript
+x = {}
+x[[1, 2, 3]] = 2;
+x; // {'1, 2, 3': 1}
+```
+특히, 숫자는 키로 사용할 수 없다. 만약 속성 이름으로 숫자를 사용하려고 하면, 자바스크립트 런타임은 문자열로 변환할 것이다.
+```typescript
+{1: 2, 3: 4};
+// {'1': 2, '3': 4}
+```
+이번엔 배열을 알아보자. 배열은 분명히 객체다
+```typescript
+typeof []; // 'object'
+```
+그러니 숫자 인덱스를 사용하는 것이 당연하다.
+```typescript
+x = [1, 2, 3];
+x[0]; //1
+```
+이상하게 보일지 모르지만, 앞의 인덱스들은 문자열로 변환되어 사용된다. 문자열 키로 사용해도 역시 배열의 요소에 접근할 수 있다.
+```typescript
+x['1']; // 2
+```
+Object.keys를 이용해 벼열의 키를 나열해 보면, 키가 문자열로 출력된다.
+```typescript
+Object.keys(x); // ['0', '1', '2']
+```
+타입스크립트는 이러한 혼란을 바로잡기 위해 숫자 키를 허용하고, 문자열 키와 다른 것으로 인식한다.
+```typescript
+interface Array<T> {
+    // ...
+    [n: number]: T;
+}
+```
+런타임에는 ECMAscript 표준이 서술하는 것처럼 문자열 키로 인식하므로 코드는 완전히 가상이라고 할 수 있지만, 타입 체크 시점에 오류를 잡을 수 있어 유용하다.
+
+```typescript
+const xs = [1, 2, 3];
+const x1 = xs['1']; // 오류. number 형식이 아님
+```
+한편 Object.keys 같은 구문은 여전히 문자열로 반환된다.
+```typescript
+const keys = Object.keys(xs); // 타입이 string[]
+for (const key in xs) {
+    key; // 타입이 string
+    const x = xs[key]; // 타입이 number
+}
+```
+string 이 number 에 할당될 수 없기 때문에, 예제의 마지막 줄이 동작하는 것이 이상하게 보일 것이다.
+배열을 순회하는 코드 스타일에 대한 실용적인 허용이라고 생각하는 것이 좋다.
+
+이 예제가 배열을 순회하는기에 좋은 방법이 아니다. 인덱스에 신경 쓰지 않는다면, for-of를 사용하는게 더 좋다.
+```typescript
+for (const x of xs) {
+    x; // 타입이 number
+}
+```
+
+만약 인덱스의 타입이 중요하다면, number 타입을 제공해 줄 forEach를 사용하면 된다.
+```typescript
+xs.forEach((x, i) => {
+    i; // 타입이 number
+    x; // 타입이 number
+})
+```
+루프 중간에 멈춰야 한다면, for(;;) 루프를 사용하는 것이 더좋다.
+
+타입이 불확실하다면, for-in 루프는 for-of 또는 for루프에 비해 몇배나 느리다.
+
+인덱스 시그니처가 number 로 표현되어 있다면 입력한 값이 number 여야 한다는 것을 의미하지만, 실제 런타임에 사용되는 키는 string이다.
+
+만약 숫자를 사용하여 인덱스할 항목을 지정한다면 Array 또는 튜플 타입을 대신 사용하게 될 것이다. number를 인덱스 타입으로 사용하면 숫자 속성이 어떤 특별한 의미를 지닌다는 오해를 불러 일으킬 수 있다.
+
+한편 Array 타입이 사용하지도 않을 push 나 concat 같은 다른 속성을 가지는게 납득하기 어려울 수 있다.
+
+어떤 길이를 가지는 배열과 비슷한 형태의 튜플을 사용하고 싶다면 타입스크립트에 있는 ArrayLike 타입을 사용한다.
+그러나 ArrayLike 를 사용하더라도 키는 여전히 문자열이라는 것을 잊지 말아야한다.
+>>>>>>> f1bb3d6a1c8699c12f81128dacc8e82f66376682
