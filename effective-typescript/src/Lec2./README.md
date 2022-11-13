@@ -941,11 +941,7 @@ const wyoming2: IState = {
 - 간단한 타입이면 보강의 관점에서 고려해 봐야한다. 일관된 타입을 고르면 된다.
 - 아직 스타일이 확립되지 않은 프로젝트라면, 향후에 보강의 가능성이 있는지 확인해 봐야 한다. 
   - API 에 대한 타입 선언을 작성해야 한다면 인터페이스.
-<<<<<<< HEAD
-  - 프로젝트 내부적으로 사용되는 타입에 선언 병합은 잘못된 설계이므로 타입을 사용해야한다
-=======
-  - 프로젝트 내부적으로 사용되는 타입에 선언 병합은 잘못된 설계이므로 타입을 사용해야한다.
-  - 
+
 
 ## Item 14. 타입 연산과 제너릭 사용으로 반복 줄이기
 다음은 원기둥의 반지름과 높이, 표면적, 부피를 출력하는 코드다.
@@ -1414,4 +1410,181 @@ xs.forEach((x, i) => {
 
 어떤 길이를 가지는 배열과 비슷한 형태의 튜플을 사용하고 싶다면 타입스크립트에 있는 ArrayLike 타입을 사용한다.
 그러나 ArrayLike 를 사용하더라도 키는 여전히 문자열이라는 것을 잊지 말아야한다.
->>>>>>> f1bb3d6a1c8699c12f81128dacc8e82f66376682
+
+## 🌈 Item 17. 변경 관련된 오류 방지를 위해 readonly 사용하기
+
+다음은 삼각수를 출력하는 코드다.
+
+```typescript
+function printTriangles(n: number) {
+    const nums = [];
+    for (let i = 0; i < n ; i++) {
+        nums.push(i);
+        console.log(arraySum(nums));
+    }
+}
+```
+
+arraySum 이 nums 를 변경하지 않는다고 간주해서 문제가 발생한다. 이 문제는 다음 코드와 같이 해결할 수 있다.
+
+```typescript
+function arraySum(arr: number[]) {
+    let sum = 0, num;
+    while ((num =arr.pop()) !== undefined) {
+        sum += sum;
+    }
+    return sum;
+}
+```
+
+이 함수는 배열 안의 숫자들을 모두 합친다. 그런데 계산이 끝나면 원래 배열이 전부 비게 된다. 자바스크립트 배열은 내용을 변경할 수 있기 때문에 타입스크립트에서도 역시 오류 없이 통과하게 된다.
+
+오류의 범위를 좁히기 위해서 readonly 접근자를 사용할 수 있다.
+
+```typescript
+function arraySum(arr: readonly number[]) {
+    let sum = 0, num;
+    while ((num =arr.pop()) !== undefined) { // 'readonly number[]' 형식에 'pop' 속성이 없습니다.
+        sum += sum;
+    }
+    return sum;
+}
+```
+
+readonly number[] 는 타입이고, number[] 와 구분되는 몇 가지 특징이 있다.
+- 배열의 요소를 읽을 수 있지만, 쓸 수는 없다.
+- length를 읽을 수 있지만, 바꿀 수는 없다.
+- 배열을 변경하는 pop 을 비롯한 다른 메서드를 호출할 수 없다.
+
+number[] 눈 readonly number[] 보다 기능이 많기 때문에, readonly number[] 의 서브 타입이 된다.
+따라서 변경 가능한 배열을 readonly 배열에 할당할 수 있다. 하지만 그 반대는 불가능하다.
+
+매개 변수를 readonly로 선언하면 다음과 같은 일이 생긴다.
+- 타입스크립트는 매개변수가 함수 내에서 변경이 일어나는지 체크한다
+- 호출하는 쪽에서 함수가 매개변수를 변경하지 않는다는 보장을 받게 된다.
+- 호출하는 쪽에서 함수에 readonly 배열을 넣을 수 도 있다.
+
+자바스크립트에서는 명시적으로 언급하지 않는 한, 함수가 매개변수를 변경하지 않는다고 가정한다.
+그러나 암묵적인 방법은 타입 체크에 문제를 일으킬 수 있다. 명시적인 방법을 사용하는 것이 컴파일러나 사람에게 좋다.
+
+```typescript
+function arraySum(arr: readonly number[]) {
+    let sum = 0, num;
+    for (const num of arr) {
+        sum += sum;
+    }
+    return sum;
+}
+```
+
+만약 함수가 매개변수를 변경하지 않는다면, readonly로 선언해야 한다.
+
+readonly 를 사용하면 지역 변수와 관련된 모든 종류의 변경 오류를 방지할 수 있다.
+
+readonly는 얕게 동작한다는 것에 유의하며 사용해야 한다.
+
+```typescript
+const dates: readonly Date[] = [new Date()];
+dates.push(new Date()); // 'readonly Date[]' 형식에 'push' 속성이 없습니다.
+dates[0].setFullYear(2037); // 정상
+```
+
+비슷한 경우가 readonly의 사촌 격이자 객체에 사용되는 Readonly 제너릭에도 해당된다.
+
+```typescript
+const dates: readonly Date[] = [new Date()];
+dates.push(new Date()); // 'readonly Date[]' 형식에 'push' 속성이 없습니다.
+dates[0].setFullYear(2037); // 정상
+
+interface Outer {
+    inner: {
+        x: number;
+    }
+}
+const ooo: Readonly<Outer> = {inner: {x:0}};
+ooo.inner = {x: 1}; // 읽기 전용 속성이므로 'inner'에 할당할 수 없습니다.
+```
+현재 시점에는 깊은 readonly 타입이 기본으로 지원되지 않지만, 제너릭을 만들면 깊은 readonly 타입을 사용할 수 있다.
+
+그러나 제너릭은 만들기 까다롭기 때문에 라이브러리를 사용하는 게낫다.
+
+## 🌈 Item 18. 매핑된 타입을 사용하여 값을 동기화하기
+산점도를 그리기 위한 UI 컴포넌트를 작성한다고 사정해 보자. 여기에는 디스플레이와 동작을 제거하기 위한 몇 가지 다른 타입의 속성이 포함된다.
+
+```typescript
+interface ScatterProps {
+    xs: number[];
+    ys: number[];
+
+    xRange: [number, number];
+    yRange: [number, number];
+    color: string;
+
+    onClick: (x: number, y: number, index: number) => void;
+    
+}
+```
+
+불필요한 작업을 피하기 위해, 필요할 때에만 차트를 다시 그릴 수 있다.
+데이터나 디스플레이 속성이 바뀌면 다시 그려야 하지만, 이벤트 핸들러가 바뀌었을 경우에는 다시 그릴 필요가 없다.
+
+최적화를 두가지 방법으로 해보자.
+```typescript
+function shouldUpdate(oldProps: ScatterProps, newProps: ScatterProps) {
+    let k: keyof ScatterProps;
+    for (k in oldProps) {
+        if (oldProps[k] !== newProps[k]) {
+            if(k !== 'onClick')
+                return true;
+        }
+    }
+    return false;
+}
+```
+
+이렇게 처리하는 것을 보수적 접근법 또는 실패에 닫힌 접근법이라고 한다. 이 접근법을 이용하면 차트가 정확하지만 너무 자주 그릴 것이다.
+
+다음은 실패에 열린 접근법이다.
+```typescript
+function shouldUpdate(oldProps: ScatterProps, newProps: ScatterProps) {
+    return (
+        oldProps.xs !== newProps.xs ||
+        oldProps.ys !== newProps.ys ||
+        oldProps.xRange !== newProps.xRange ||
+        oldProps.yRange !== newProps.yRange ||
+        oldProps.color !== newProps.color 
+        // not check onclick
+    )
+}
+```
+
+이 코드는 차트를 불필요하게 다시 그리는 단점을 해결했다. 하지만 실제로 차트를 다시 그려야 할 경우에 누락되는 일이 발생할 수 있다.
+
+앞선 두가지 방법 모두 이상적이지 않다. 속성이 추가될 때마다 코드의 수정이 필요하기 때문이다.
+다음은 타입 체커가 동작하도록 개선한 코드다. 핵심은 매핑된 타입과 객체를 사용하는 것이다.
+
+```typescript
+const REQUIRES_UPDATE: {[k in keyof ScatterProps]: boolean} = {
+    xs: true,
+    ys: true,
+    xRange: true,
+    yRange: true,
+    color: true,
+    onClick: false
+};
+
+function shouldUpdate(oldProps: ScatterProps, newProps: ScatterProps) {
+    let k : keyof ScatterProps;
+    for (k in oldProps) {
+        if(oldProps[k] !== newProps[k] && REQUIRES_UPDATE[k]) {
+            return true;
+        }
+    }
+    return false;
+}
+```
+
+이와 같은 코드는 새로운 속성이 추가될 경우 오류를 정확히 잡아 낸다. 속성을 삭제하거나 이름을 바꾸어도 비슷한 오류가 발생하다.
+여기서 boolean 값을 가진 객체를 사용했다는 점이 중요하다.
+
+매핑된 타입은 한 객체가 또 다른 객체와 정확히 같은 속성을 가지게 할 때 이상적이다.
